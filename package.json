@@ -1,0 +1,39 @@
+{
+  "name": "mlgw-outage-source-pilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test",
+    "pilot": "node scripts/pilot.mjs",
+    "pilot:once": "node scripts/pilot.mjs --once",
+    "analyze": "node scripts/analyze.mjs",
+    "benchmark": "node scripts/benchmark.mjs",
+    "storage": "node scripts/storage-alternative.mjs",
+    "collector:import": "node scripts/collector.mjs import",
+    "collector:status": "node scripts/collector.mjs status",
+    "collector:recover": "node scripts/collector.mjs recover",
+    "collector:replay": "node scripts/collector.mjs replay",
+    "collector:run": "node scripts/collector.mjs run",
+    "collector:verify": "node scripts/verify-durable.mjs",
+    "dashboard:typecheck": "tsc --noEmit",
+    "dashboard:build": "npm run dashboard:typecheck && node scripts/build-dashboard.mjs",
+    "dashboard:verify": "node scripts/verify-dashboard.mjs",
+    "dashboard": "node scripts/dashboard.mjs",
+    "preview:start": "node scripts/preview.mjs start",
+    "preview:status": "node scripts/preview.mjs status",
+    "preview:stop": "node scripts/preview.mjs stop"
+  },
+  "dependencies": {
+    "chart.js": "4.5.1",
+    "leaflet": "1.9.4"
+  },
+  "devDependencies": {
+    "@types/leaflet": "1.9.22",
+    "esbuild": "0.28.2",
+    "typescript": "7.0.2"
+  }
+}

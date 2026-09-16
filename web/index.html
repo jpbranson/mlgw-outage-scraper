@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>MLGW · Outage observatory</title>
+  <link rel="stylesheet" href="/app.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <main>
+    <header class="page-header">
+      <div><p class="eyebrow"><span class="brand-mark" aria-hidden="true">↗</span> MEMPHIS / MLGW</p><h1>Outage observatory<span>.</span></h1></div>
+      <div class="freshness" id="freshness" role="status"><span class="status-dot"></span><div><strong id="freshness-label">Connecting…</strong><small id="freshness-time">Checking captures</small></div></div>
+    </header>
+    <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">Retry</button></div>
+    <section class="selection-bar" aria-label="Selected capture">
+      <div><span id="selection-mode" class="selection-mode">Latest capture</span><h2 id="selected-time">Loading…</h2></div>
+      <button id="latest" class="button-dark">Latest <span aria-hidden="true">↗</span></button>
+    </section>
+    <section class="metrics" aria-label="Totals for selected capture">
+      <article class="metric metric-primary"><p>Customers affected</p><strong id="customers">—</strong></article>
+      <article class="metric"><p>Reported outages</p><strong id="outages">—</strong></article>
+      <article class="metric"><p>Customer change</p><strong id="change">—</strong></article>
+      <article class="metric"><p>Daily peak <span class="muted">(UTC)</span></p><strong id="peak">—</strong></article>
+    </section>
+    <div class="visual-grid">
+      <section class="panel map-panel" aria-labelledby="map-heading">
+        <div class="panel-heading"><h2 id="map-heading">Outage map</h2><button id="fit-map" class="button-quiet">Reset <span aria-hidden="true">⤢</span></button></div>
+        <div class="map-wrap"><div id="map" aria-label="Approximate reported outage points"></div><div id="map-notice" class="map-notice" role="status" hidden></div><div class="map-key"><span class="legend-circles" aria-hidden="true"><i></i><i></i><i></i></span> Customers affected</div></div>
+        <div class="history-controls">
+          <div class="history-heading"><label for="archive-date">Replay <span class="muted">(UTC date)</span></label><input type="date" id="archive-date"></div>
+          <div class="slider-row"><button id="previous" aria-label="Previous capture">←</button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Historical capture" disabled><button id="next" aria-label="Next capture">→</button></div>
+          <div class="slider-labels"><span id="first-time">—</span><span id="slider-time">No capture selected</span><span id="last-time">—</span></div>
+        </div>
+      </section>
+      <section class="panel chart-panel" aria-labelledby="chart-heading">
+        <div class="panel-heading"><h2 id="chart-heading">History</h2><span id="chart-zone" class="muted">Central time</span></div>
+        <div class="chart-controls"><div class="segmented" aria-label="Chart measure"><button data-metric="customers" aria-pressed="true">Customers</button><button data-metric="outages" aria-pressed="false">Outages</button></div><div class="segmented range-buttons" aria-label="Chart period"><button data-days="1" aria-pressed="true">24h</button><button data-days="7" aria-pressed="false">7d</button><button data-days="30" aria-pressed="false">30d</button></div></div>
+        <div class="chart-legend"><span><i class="legend-line" aria-hidden="true"></i><span id="series-label">Captured totals</span></span><span><i class="legend-selected" aria-hidden="true"></i>Selected</span></div>
+        <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Outage history chart. Select a point to open its map. The replay slider is a keyboard-accessible alternative."></canvas><p id="chart-empty" hidden>No captures in this period</p></div>
+        <div class="coverage-wrap"><div class="coverage-label"><span id="coverage">Loading coverage…</span><span class="muted">Gaps = unknown</span></div><progress id="coverage-meter" max="1" value="0" aria-label="Time coverage in selected period"></progress></div>
+        <div class="chart-footer"><a id="csv" class="export-link" href="/api/export.csv">CSV ↓</a><a id="geojson" class="export-link" aria-disabled="true">Map GeoJSON ↓</a></div>
+      </section>
+    </div>
+    <section class="below-grid" aria-label="Capture details">
+      <div class="panel long-running"><div class="list-heading"><h2>Outages over 6h</h2><span id="long-count" class="count-badge">—</span></div><div id="long-list"><p class="muted">Loading…</p></div></div>
+      <div class="details-column">
+        <div class="signals" aria-label="Capture signals"><div class="signal" id="rise-signal"><span class="signal-icon" aria-hidden="true">↗</span><h3 id="rise-title">Checking change</h3></div><div class="signal"><span class="signal-icon" aria-hidden="true">◷</span><h3 id="baseline-title">Learning baseline</h3></div></div>
+        <details class="panel data-notes"><summary>Data notes</summary><div class="notes-content">
+          <dl><dt>Selected capture</dt><dd id="selected-note">Times shown in Central time unless labeled UTC.</dd><dt>Customer change</dt><dd id="change-note">Comparable observations only</dd><dt>Daily customer peak</dt><dd id="peak-note">Observed through selected capture</dd><dt>Archive day</dt><dd id="capture-count">— captures</dd><dt>Sharp increase</dt><dd id="rise-copy">Checking comparable captures…</dd><dt>Historical baseline</dt><dd id="baseline-copy">Requires 28 days with at least 90% valid coverage.</dd><dt>Long outages</dt><dd id="long-note">Duration is based on the source start time.</dd><dt>Chart</dt><dd id="series-note">Select a chart point to inspect its captured map.</dd><dt>Coverage</dt><dd id="quality-note">Missing observations are unknown; gaps are never counted as zero.</dd></dl>
+          <p>Map points are approximate, not customer addresses or outage boundaries. Source timestamps assume Central time. Basemap labels are supplied by OpenStreetMap.</p><p>Capture time is retrieval time; the feed provides no publication timestamp. Refreshes every 60 seconds.</p>
+        </div></details>
+      </div>
+    </section>
+    <footer><span>Independent local pilot</span><a href="https://outagemap.mlgw.org/OutageSummary.php" target="_blank" rel="noopener noreferrer">Official MLGW map ↗</a></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "mode": "local",
+  "root": "data/collector",
+  "pilotDirectory": "data/pilot",
+  "runDays": 7,
+  "pollIntervalMs": 300000,
+  "checkIntervalMs": 30000,
+  "localBudgetBytes": 10000000000,
+  "minimumFreeDiskBytes": 20000000000,
+  "warningFraction": 0.7,
+  "offloadFraction": 0.8,
+  "urgentFraction": 0.9,
+  "automaticDeletion": false,
+  "protectedYearDays": 365,
+  "offlineReserveDays": 30
+}
