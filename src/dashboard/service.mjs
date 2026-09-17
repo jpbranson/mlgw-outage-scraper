@@ -1,6 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { Archive } from '../durable/archive.mjs';
+import { spatialHistory, SpatialLimitError } from './spatial.mjs';
+import { CensusAreas } from './census.mjs';
 
 export const DAY = 86400000, SLOT = 300000, MAX_GAP = 450000;
 export const SOURCE = { name: 'Memphis Light, Gas and Water', url: 'https://outagemap.mlgw.org/OutageSummary.php',
@@ -78,7 +80,10 @@ export class DashboardService {
     if (!/^[a-zA-Z0-9_-]{1,120}$/.test(id)) throw new RequestError('Invalid capture ID.');
     const row = this.row(id);
     if (!row) throw new RequestError('Accepted capture not found.', 404);
-    const result = { summary: this.summary(row), source: SOURCE, quality: 'valid' };
+    return { summary: this.summary(row), source: SOURCE, quality: 'valid', detail: await this.mapDetail(row) };
+  }
+  async mapDetail(row) {
+    const id = row.id;
     try {
       const meta = this.db.prepare('SELECT a.manifest_key,a.manifest_hash,s.raw_hash,s.parser_hash FROM poll_attempts a JOIN snapshots s ON s.id=a.id WHERE a.id=?').get(id);
       const { manifest, hash } = this.archive.readManifest(meta.manifest_key);
@@ -92,17 +97,35 @@ export class DashboardService {
         properties: { outageId: text(f.properties.outageId), customers: f.properties.customers,
           started: publicTime(f.properties.started), estimatedRepair: publicTime(f.properties.estimatedRepair),
           status: text(f.properties.status) } }));
-      result.detail = { available: true, geojson: { type: 'FeatureCollection', features },
+      return { available: true, geojson: { type: 'FeatureCollection', features },
         unmapped: features.filter(f => !f.geometry).length, flags: parsed.issues.map(i => i.code),
         longRunning: features.filter(f => f.properties.started.utc && row.at - Date.parse(f.properties.started.utc) > 6 * 3600000)
           .map(f => ({ id: f.id, customers: f.properties.customers, startedAt: f.properties.started.utc,
             hours: (row.at - Date.parse(f.properties.started.utc)) / 3600000 })).sort((a, b) => b.hours - a.hours),
         unknownStartTimes: features.filter(f => !f.properties.started.utc).length };
     } catch {
-      result.detail = { available: false, reason: 'Archived map detail is unavailable or could not be verified. Accepted totals remain available.' };
+      return { available: false, reason: 'Archived map detail is unavailable or could not be verified. Accepted totals remain available.' };
     }
-    return result;
   }
+  async spatial(params) {
+    const rangeParams = new URLSearchParams(params); rangeParams.set('resolution', 'daily');
+    const { from, to } = period(rangeParams, this.now());
+    const geography = params.get('geography') || 'grid';
+    if (!['grid', 'block-group'].includes(geography)) throw new RequestError('Choose grid or block-group geography.');
+    const census = geography === 'block-group' ? this.censusAreas() : null;
+    if (this.spatialBusy) throw new RequestError('A historical map is already loading. Retry shortly.', 429);
+    this.spatialBusy = true;
+    try {
+      const history = await spatialHistory({ rows: this.rows(from, to), from, to,
+        readDetail: row => this.mapDetail(row), comparable: (a, b) => this.comparable(a, b),
+        ...(census ? { locate: coordinates => census.locate(coordinates) } : {}) });
+      return census ? census.normalize(history) : history;
+    } catch (error) {
+      if (error instanceof SpatialLimitError) throw new RequestError(error.message, 413);
+      throw error;
+    } finally { this.spatialBusy = false; }
+  }
+  censusAreas() { return this.census ??= new CensusAreas(); }
   snapshots(date) {
     if (!/^\d{4}-\d\d-\d\d$/.test(date ?? '') || !Number.isFinite(Date.parse(date)) || iso(Date.parse(date)).slice(0, 10) !== date)
       throw new RequestError('Choose a valid archive date in YYYY-MM-DD format (UTC).');

@@ -27,10 +27,13 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
       if (path.startsWith('/api/')) {
         if (Date.now() - windowStart >= 60000) { windowStart = Date.now(); requests = 0; }
         if (++requests > requestLimit) { res.setHeader('Retry-After', '60'); throw new RequestError('Local request budget reached. Retry in one minute.', 429); }
-        if (path === '/api/config') return send(200, { tiles, attribution, attributionUrl });
+        if (path === '/api/config') return url.searchParams.get('view') === 'census'
+          ? send(200, service.censusAreas().data, undefined, 'private, max-age=86400')
+          : send(200, { tiles, attribution, attributionUrl });
         if (path === '/api/health') return send(200, service.health());
         if (path === '/api/latest') return send(200, await service.latest());
-        if (path === '/api/series') return send(200, service.series(url.searchParams), undefined, 'private, max-age=30');
+        if (path === '/api/series') return send(200, url.searchParams.get('view') === 'spatial'
+          ? await service.spatial(url.searchParams) : service.series(url.searchParams), undefined, 'private, max-age=30');
         if (path === '/api/snapshots') return send(200, service.snapshots(url.searchParams.get('date')));
         if (path.startsWith('/api/snapshot/')) return send(200, await service.snapshot(path.slice(14)), undefined, 'private, max-age=60');
         if (path === '/api/export.csv') {

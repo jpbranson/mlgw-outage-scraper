@@ -12,7 +12,7 @@ Open **http://127.0.0.1:4173** while the local server is running. The dashboard 
 - Customers/events chart with 24-hour five-minute observations, seven-day hourly peaks and 30-day daily peaks. Gaps are unknown, not zero. Partially covered summary buckets are shown as unconnected points, with explicit coverage and actual peak timestamps. Customer and event peaks can open different captures.
 - Sharp-rise signals require at least 100 additional customers and doubling (zero uses the absolute threshold), within the collector's stricter 7.5-minute continuity window and with no intervening failed/suspect attempt. Larger red chart points mark qualifying captures.
 - A robust 28-day baseline is implemented but remains in learning mode until at least 90% valid slot coverage exists. Threshold: median plus max(100, 6 × 1.4826 × MAD). Six-hour reported durations use source start times at the selected capture, with missing/ambiguous timestamps explicit.
-- Bounded period CSV and single-capture GeoJSON exports. The initial list uses long-running events; recurring-cell ranking and `/api/spatial-summary` remain optional future work.
+- Bounded period CSV and single-capture GeoJSON exports. The initial list uses long-running events. A cumulative historical cell map was added later; see the addendum below.
 
 ## Data and access limits
 
@@ -48,3 +48,39 @@ Applied the user's request for a visuals-first dashboard, minimal prose, Inter o
 Strict TypeScript checking and the frontend build pass; all 11 dashboard tests pass. Browser checks at desktop and 390 × 844 confirmed Inter loaded, no interface text below 16 px, no horizontal overflow, historical replay, metric/range controls, expandable notes and readable scrolling map popups. Corrected popup positioning after selecting a long outage and hid overlapping floating controls while a popup is open. Browser console had no warnings/errors. Screenshots: `reports/dashboard-mobile.png` and `reports/dashboard-desktop.png`.
 
 The local dashboard restarted as hidden PID 4740 for the font content type change (verify identity before stopping). The existing authenticated preview serves the redesign with the same link, password and expiry; its supervisor/tunnel and capture processes were left running. Phase 4 remains deferred.
+
+## Simpler utility layout — September 16, later update
+
+Applied the user's subsequent direction to avoid generic SaaS styling. Replaced the branded title and boxed metric grid with “MLGW outages,” a Memphis/Shelby County label and inline totals. The map occupies most of the desktop width; history and long-outage records use a narrower column, with natural stacking on phones. Removed cards, rounded controls, shadows, badges, decorative arrows/icons, duration bars, the coverage progress bar and smooth map/scroll movement. The map legend sits below the map. Retained functional map details, exact chart values, exports, replay and concise data-quality information.
+
+Uses a plain serif title, monospace numeric/time labels and Inter controls, retaining the 12 pt interface minimum. TypeScript/build, static element-reference and HTML nesting checks, and the local HTTP response pass. This update did not repeat browser visual testing. The existing preview serves the updated build; collection and preview lifetime are unchanged. These revisions follow the initial GitHub commit and have not been committed or pushed.
+
+## Default ggplot aesthetics — September 16, subsequent update
+
+The user then requested default ggplot aesthetics. Applied ggplot2's `theme_grey` appearance to the existing interactive viewer: a #EBEBEB chart panel, white major and thinner minor gridlines in both directions, dark ticks, no plot border, black lines/points, and plain sans-serif text. Larger triangles preserve sharp-rise indications; the selected capture has a dashed black line. Updated legends and notes to match. The geographic basemap is grayscale and its size-scaled outage points are black. The layout stays utilitarian and interface text stays at least 12 pt, rather than adopting ggplot's smaller default label sizes.
+
+TypeScript checking and the frontend build pass. No browser visual QA was performed for this styling update. The running local server serves the rebuilt assets through the existing preview. The change does not migrate rendering to R or change capture/history calculations.
+
+## Theme minimal, no emoji — September 16, subsequent update
+
+Changed the chart to ggplot2 `theme_minimal`: removed the gray panel fill and axis tick marks, and changed both major and minor gridlines to pale gray on white. Black data marks and the thinner minor grid are retained. Replaced replay/export arrows with text and replaced Leaflet's default graphic attribution prefix with a plain text link; source attribution is preserved. The user's no-emoji preference is recorded in the README.
+
+TypeScript/build and whitespace checks pass. Desktop and 390 px browser checks confirm the minimal chart appearance, working historical replay, no horizontal page overflow, no text below 16 px, no emoji presentation characters in displayed text, and no graphic in the Leaflet attribution prefix. Capture data, calculations, access and preview expiry are unchanged.
+
+## Cumulative history map and drawn arrows — September 16, 23:17 UTC
+
+Previous/next replay buttons now use stroked inline SVG arrows, with accessible labels and 44 px targets. The map has **One capture / All history** controls and an independent map-period selector. History mode combines verified archive locations into a fixed, approximately 1 km grid. Circle size represents distinct provisional source ID/start pairs per cell, deduplicating repeated polls. Popups show first/last observed capture times, peak simultaneous customers and uncertain identity counts. Missing detail, unmapped observations, continuity and provisional identity limitations are retained in Data notes. History mode hides single-capture totals, duration records and GeoJSON export so they cannot be mistaken for whole-period values. Chart selection returns to the selected actual capture.
+
+Replay is read-only and bounded to 31 days, one million observations, 50,000 events and ten seconds, with one concurrent request and an explicit shorter-period error on limits. The existing `/api/series` allowlist supports its new spatial view; preview credentials and expiry did not change. The dashboard alone restarted as hidden PID 4072; verify its command line before stopping. Capture and preview processes remained running.
+
+`npm test`: **61/61 pass**, including nine added tests for frequency deduplication, simultaneous peaks, moving locations, changing/ambiguous identities, missing evidence, gaps, empty captures, grid membership, limits and the HTTP route. TypeScript/build and whitespace checks pass. A local API check at 23:16:55 UTC replayed all **81 captures**, yielding **237 provisional events in 74 areas**, four uncertain identities, no unavailable details or unmapped observations, and 99.5% observed time coverage. The response was 14,308 bytes and the check completed in about 200 ms. These are checkpoint values, not current outage totals. Evidence: ignored `reports/spatial-verification.json`. No browser visual QA was performed for this update. Older legacy history remains unimported, Phase 4 remains deferred, and these revisions are not committed or pushed.
+
+## Heatmap and Census per-capita maps — September 16, 23:44 UTC
+
+Replaced cumulative circles with a continuous blue density heatmap. It smooths deduplicated 1 km event cells using a fixed 750 m Gaussian bandwidth and a 2.25 km support radius. A period-wide square-root color scale preserves visibility of isolated locations, without rescaling during map movement. The plain `theme_minimal` layout and drawn arrow controls remain.
+
+Added **Per capita** with outage-event and peak-customer measures per 1,000 estimated residents. Downloaded the official 2020–2024 ACS five-year population table B01003 and matching 2024 TIGERweb polygons, then joined all 685 Shelby County block groups. Population reconciles to 919,173; five areas have no positive denominator. Stored the 574 KiB compressed reference, source hashes and provenance locally. Census block groups have newer population estimates than Census blocks. Exact original outage coordinates are assigned to polygons; heatmap cell centers are not used for this join. Rates retain missing/zero denominators, population margins of error, uncertain incident identities and excluded observations. A visible caption distinguishes approximate location-based rates from the share of residents without power.
+
+`npm test`: **67/67 pass**, with added coverage for polygon holes/multipart geometries, ambiguous shared boundaries, population denominators, simultaneous peaks, moving reports, complete Census geography joins and the read-only API. Strict TypeScript/build and whitespace checks pass. Desktop and 390 × 844 browser checks verified both new views, measure switching, population/MOE popups, no horizontal overflow, no text below 16 px and no console warnings/errors. Viewport overrides were reset afterward.
+
+At 23:43:51 UTC, the local API replayed 86 captures in about 188 ms, with 239 provisional events assigned to 74 block groups, no missing detail or unassigned observations, and 99.1% time coverage. Anonymous requests to both new view routes were denied by the existing local preview gateway; authenticated requests succeeded. Evidence: ignored `reports/census-verification.json`. The dashboard restarted as hidden PID 1520; collection and the existing preview credentials/expiry were preserved. Phase 4 remains deferred. These changes are not committed or pushed.

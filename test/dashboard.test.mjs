@@ -147,3 +147,44 @@ test('local request budget responds with retry guidance', async t => {
   await fetch(`${url}/api/health`); await fetch(`${url}/api/health`);
   const response = await fetch(`${url}/api/health`); assert.equal(response.status, 429); assert.equal(response.headers.get('retry-after'), '60');
 });
+test('historical map replays verified originals, deduplicates polls and respects missing evidence', async t => {
+  const { add, collector, service } = setup(t); add('a', 0, 10); add('b', 5, 20); add('c', 10, 5);
+  const result = await service.spatial(params());
+  assert.equal(result.reportedEvents, 1); assert.equal(result.cells.length, 1);
+  assert.equal(result.cells[0].peakCustomers, 20); assert.equal(result.coverage, 10 / 60);
+  assert.equal(result.verifiedCaptures, 3); assert.equal(result.unavailableCaptures, 0);
+  assert.doesNotMatch(JSON.stringify(result), /OUT_CAUSE|THIS MUST STAY PRIVATE|raw_key|manifest_key/);
+  const first = collector.archive.readManifest('manifests/a.json').manifest;
+  unlinkSync(collector.archive.path(first.bodies.feed.key));
+  const partial = await service.spatial(params());
+  assert.equal(partial.verifiedCaptures, 2); assert.equal(partial.unavailableCaptures, 1);
+  assert.equal(partial.coverage, 5 / 60); assert.equal(partial.firstVerifiedAt, base + 5 * 60000);
+  assert.equal(partial.cells[0].firstSeenAt, base + 5 * 60000);
+});
+test('historical map route uses the same bounded read-only API and rejects invalid windows', async t => {
+  const { add, service, dir } = setup(t); add('a', 0, 10);
+  const url = await serve(t, service, dir), query = params(); query.set('view', 'spatial');
+  const response = await fetch(`${url}/api/series?${query}`);
+  assert.equal(response.status, 200); assert.equal((await response.json()).mappedEvents, 1);
+  assert.equal((await fetch(`${url}/api/series?${query}`, { method: 'POST' })).status, 405);
+  await assert.rejects(service.spatial(params(base - 32 * DAY, base)), /31 days/);
+  await assert.rejects(service.spatial(new URLSearchParams('from=garbage')), /ISO/);
+  const replay = service.spatial(params());
+  await assert.rejects(service.spatial(params()), error => error.status === 429);
+  await replay;
+  assert.equal((await service.spatial(params())).verifiedCaptures, 1);
+});
+test('per-capita API joins matching Census geometry and population without exposing source cause fields', async t => {
+  const { add, service, dir } = setup(t); add('a', 0, 10); add('b', 5, 20);
+  const url = await serve(t, service, dir), query = params(); query.set('view', 'spatial'); query.set('geography', 'block-group');
+  const geometry = await (await fetch(`${url}/api/config?view=census`)).json();
+  assert.equal(geometry.features.length, 685);
+  const response = await fetch(`${url}/api/series?${query}`); assert.equal(response.status, 200);
+  const data = await response.json(), active = data.cells.filter(c => c.events);
+  assert.equal(data.geography, 'block-group'); assert.equal(active.length, 1); assert.equal(active[0].events, 1);
+  assert.equal(active[0].peakCustomers, 20);
+  assert.equal(active[0].customersPer1000, 20000 / active[0].population);
+  assert.ok(geometry.features.some(f => f.id === active[0].id));
+  assert.doesNotMatch(JSON.stringify(data), /OUT_CAUSE|THIS MUST STAY PRIVATE/);
+  query.set('geography', 'arbitrary'); assert.equal((await fetch(`${url}/api/series?${query}`)).status, 400);
+});
