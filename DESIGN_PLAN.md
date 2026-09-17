@@ -1,10 +1,12 @@
 # MLGW outage history and dashboard: design plan
 
-Prepared September 16, 2026. This document proposes an implementation; it does not create cloud resources or start collection.
+Prepared September 16, 2026; updated with weather scope and the implementation checkpoint later that day. Editing this plan does not start collection, deploy resources, install tasks, or authorize an additional implementation stage.
+
+**Current scope:** collection, validation and the dashboard run locally. The user authorized a temporary authenticated phone preview separately; it does not change the planned production audience or authorize permanent cloud deployment. Local Phases 1–2 trials are underway and the Phase 3 dashboard, historical heatmap and Census per-capita maps are implemented. Weather features below are planned, not implemented. Cloud runtime validation and desktop transfer/cleanup remain deferred until requested.
 
 ## 1. Recommended approach
 
-Build a small TypeScript application on Cloudflare: a scheduled Worker collects MLGW's public GeoJSON feed, R2 stores historical snapshots, D1 stores compact time-series summaries, and a static dashboard displays a map and a few charts.
+The original production candidate is a small TypeScript application on Cloudflare: scheduled compute collects MLGW's public GeoJSON feed, R2 stores historical snapshots, D1 stores compact time-series summaries, and a static dashboard displays a map and charts. The local implementation uses Node, filesystem archives and SQLite. Phase 1 measurements favor testing a Durable Object for ingestion compute and compressed originals with a bounded normalized cache; the ordinary Worker-only design has not passed its resource gate. Keep the parser and analytics portable.
 
 Start with **five-minute collection**, with a configurable one-minute option after measuring the source's actual update frequency. Keep detailed observations indefinitely where practical. Retain them in the cloud while space permits; under storage pressure, transfer detail older than one year to this Windows PC, verify it, and then remove only those verified cloud copies. Keep the newest year in cloud storage and long-term summaries available to the dashboard.
 
@@ -17,9 +19,15 @@ The useful first version answers:
 - Where are the current outages, and what did the map show earlier?
 - Which increases, long-running outages, or recurring locations warrant a closer look?
 
+The weather extension will also answer:
+
+- Where was precipitation occurring as outages appeared, and how much rain fell during and before that period?
+- Which areas had more newly reported outages or greater observed interruption burden during heavy rain, prolonged rainfall, high winds, flash-flood episodes, snow, ice and heat waves?
+- Do those associations persist across comparable events, weather exposure and population denominators, with missing observations and source-format changes visible?
+
 ### Confirmed requirements and remaining setup choices
 
-The audience, retention intent, cost priority, and 30-day offline-PC allowance below reflect the user's September 16 clarifications. The work remains a design plan; cloud deployment and Windows-task installation are implementation steps.
+The audience, retention intent, cost priority, and 30-day offline-PC allowance below reflect the user's September 16 clarifications. Local implementation status is recorded separately from future production requirements; cloud deployment and Windows-task installation remain deferred implementation steps.
 
 | Decision | Requirement or selected approach | Implementation implication |
 | --- | --- | --- |
@@ -27,8 +35,10 @@ The audience, retention intent, cost priority, and 30-day offline-PC allowance b
 | History | Preserve detail as long as possible; newest year always in the cloud | Move older detail to the PC only when storage pressure warrants it; verify local receipt before cloud deletion. |
 | Cloud provider | No preference; prioritize free | Start by validating Cloudflare; select another free-tier compute option if necessary. |
 | Budget | Free-first; no paid compute commitment | Measure compressed annual storage and storm processing before launch; do not enable paid upgrades automatically. |
-| Scope | All reported MLGW electric outages; anomalies shown in the dashboard | Automated notifications and weather correlation can follow later. |
-| Desktop setup | PC is on irregularly; reserve at least 30 days of offline headroom | Size the reserve from projected storage growth, including storm periods. Select a dedicated archive folder during implementation, such as `%USERPROFILE%\MLGW-Archive`. |
+| Scope | All reported MLGW electric outages; anomalies, historical heatmap and Census per-capita maps in the dashboard | Add synchronized radar/rainfall replay and weather-condition analysis in Phases 3A and 5. Automated notifications remain optional. |
+| Validation and access now | Local validation; separately authorized temporary authenticated phone preview | Weather work can run locally. Do not infer authorization for cloud deployment, a new preview session, or persistent public access. |
+| Weather scope | Radar, rainfall accumulation and historical conditions including flash flood, prolonged rain, snow, ice and heat | Include wind alongside rain; distinguish measurements, warnings, reported events and derived condition labels. Start with radar/rainfall, then comparative analysis. |
+| Desktop setup | PC is on irregularly; reserve at least 30 days of offline headroom | Size the reserve from projected storage growth, including storm periods. The provisional archive folder is `C:\Developer\mlgw-outage-scraper\archive`; recheck capacity for Phase 4B. |
 
 ## 2. Source discovery: what is already verified
 
@@ -80,6 +90,21 @@ Method: extract one unique `(time, outage_num, cust_affected)` summary per times
 The [`total_parsed_polygons.rds`](https://github.com/jpbranson/mlgw.outage.3/blob/ea0c8309337171b398ffadd5d6105d997f9b354b/total_parsed_polygons.rds) file contains 18,906 snapshots with finite spatial coordinates, 127 distinct grid-cell IDs, and coverage dated March 8, 2022–April 27, 2024. Its 154,933 valid snapshot/cell records expand to 774,665 vertex rows. Other rows include missing-coordinate placeholders; those are not extra outages. The latest [scraper source](https://github.com/jpbranson/mlgw.outage.3/blob/ea0c8309337171b398ffadd5d6105d997f9b354b/R/job.R) has polygon processing commented out, so spatial coverage must be audited separately from total-count coverage.
 
 Import this history with `source_format=legacy_html` and preserve its geographic grid polygons. Use `source_format=current_geojson` for new point features. Legacy cell IDs are geographic-area IDs, not current outage IDs; do not turn grid centroids into precise outage locations or distribute grid customer totals among individual events. Show a source-format boundary on charts and do not use old-map observations to train the new-feed anomaly baseline without a comparability check.
+
+### Historical weather sources: documented candidates
+
+Source documentation was reviewed September 16, 2026. Availability and suitability are documented; end-to-end local weather retrieval, decoding and alignment have not yet been validated. Phase 3A verifies them before enabling the weather layers.
+
+| Source | Planned use | Resolution, history and limits |
+| --- | --- | --- |
+| [Iowa Environmental Mesonet NEXRAD mosaics](https://mesonet.agron.iastate.edu/docs/nexrad_mosaic/) and [timestamped map services](https://mesonet.agron.iastate.edu/ogc/) | Historical radar reflectivity overlay synchronized with outage replay | Five-minute mosaics; the higher-detail N0Q archive is documented from November 2010. Reflectivity is a signal in dBZ, not rainfall depth or confirmed surface precipitation. Check actual frame availability; transparent pixels alone cannot prove dry conditions. |
+| [NOAA MRMS precipitation products](https://mapservices.weather.noaa.gov/raster/rest/services/obs/mrms_qpe/ImageServer), [IEM archived layers](https://mesonet.agron.iastate.edu/ogc/) and [NOAA open-data archive](https://registry.opendata.aws/noaa-mrms-pds/) | Rainfall-rate/accumulation display and quantitative spatial rainfall summaries | Approximately 1 km products. IEM documents archived 1/24/48/72-hour accumulation layers at hourly endpoints since early 2015. NOAA's open archive starts in October 2020. Use numeric grids for analysis, not colors sampled from display tiles. Product variants, gauge adjustment, version changes, coverage and units must remain explicit. |
+| [NOAA Global Hourly / ISD](https://www.ncei.noaa.gov/products/land-based-station/integrated-surface-database) | Historical temperature, dew point/humidity, wind/gusts, precipitation and available present-weather/snow observations | Station-specific histories and completeness vary. Select Memphis-area stations by metadata and observed coverage; a station reading is not a measurement for every Census block group. Preserve quality flags, reporting interval and station moves. |
+| [NOAA Storm Events](https://www.ncei.noaa.gov/access/storm-events-database/assets/pdf/Storm_Events_Database_User_Guide.pdf), with [IEM NWS warning archives](https://mesonet.agron.iastate.edu/ogc/) where supported | Context for flash floods, thunderstorm winds, snow/ice, heat and other documented episodes | Event records can be county/forecast-zone based and are published with a delay. Warning polygons describe warned areas, not confirmed damage footprints. Missing reports do not establish that a hazard was absent. Audit archive completeness and geometry before spatial use. |
+
+IEM's [MRMS archive notice](https://mesonet.agron.iastate.edu/archive/mrms.php) now describes a rolling 30-day cache for hourly raw ZIP files. Do not treat that convenience cache as permanent storage; use the documented long-term archives and preserve the inputs needed for each saved analysis. NOAA's MRMS open-data archive does not require an AWS account. Access methods and caching conditions must be checked during implementation; public data availability is not an uptime guarantee.
+
+The current-feed outage archive starts September 16, 2026, but the already identified legacy observations can support older weather comparisons after import. Spatial comparisons are limited by the separate legacy geometry coverage and gaps described above. Total-only observations support regional time-series comparisons, not invented neighborhood maps.
 
 ## 3. Collection frequency and reliability
 
@@ -206,6 +231,17 @@ The PC is on irregularly, so **30 days of offline headroom is a confirmed requir
 
 There is a real capacity boundary: offloading data older than a year cannot help if the newest year alone exceeds free storage, or if the PC stays unavailable beyond the reserve. Measure this before launch. Compress/deduplicate first, prefer five-minute over one-minute collection if needed, and evaluate other free capacity before paid service. If the requirements no longer fit, surface the storage/cadence decision rather than silently deleting the protected year, losing old detail, or promising unlimited free retention.
 
+### Weather storage and jobs — Phase 3A, extended in Phase 5
+
+Keep weather acquisition and processing separate from MLGW polling. Weather failures, rate limits or heavy raster processing must not delay outage capture or alter an accepted snapshot. Start with bounded local jobs and a separate cache/storage budget; cloud weather compute and bandwidth would need their own later capacity assessment.
+
+- Maintain a weather manifest with provider, product/version, source URL, observation/valid time or interval, retrieval time, units, CRS/grid or station ID, quality/missing-data flags, checksum and processing version. Record original weather times even when displaying a nearest eligible frame.
+- Cache selected Memphis-area imagery and numeric subsets on demand. Use immutable timestamped cache keys, bounded time windows, request concurrency and retry/backoff. Avoid continuously retaining national radar volumes. Distinguish disposable display-cache entries from evidence required to reproduce a saved comparison.
+- Preserve source-aligned numeric rainfall subsets, station observations, event/warning records and checksums for saved analyses. Keep full national files only as bounded processing inputs where required; validate the retained subset and its extraction provenance before discarding temporary derivatives. Do not change outage retention rules.
+- Store compact weather summaries by native weather cell/station and time bucket, plus area-weighted summaries where appropriate. Store saved analysis periods, exposure/coverage, metric definitions and source/vintage versions. Separate measured data from derived condition classifications and cached visualizations.
+- Derive long accumulations from non-overlapping increments or an explicitly matching source accumulation period. Never add overlapping rolling 24-hour rainfall totals. Preserve missing and trace values as distinct from measured zero.
+- Measure download volume, disk growth, decode time and map payloads using a wet multi-day period as well as dry data. Select a weather-cache size after those measurements; it must fit inside the local free-space floor and any future shared cloud reserve.
+
 ## 6. Time, outage identity, and spatial meaning
 
 Store observation times as UTC instants; display them in `America/Chicago`. Source date strings lack an explicit offset. Preserve them verbatim and provisionally interpret them in `America/Chicago`, recording that assumption. Use an explicit format/time-zone parser, not JavaScript's implicit date parsing. Ambiguous fall-back DST times should carry an ambiguity flag rather than an invented precise instant.
@@ -217,6 +253,12 @@ An outage disappearing from a complete snapshot means **no longer reported**, no
 Validate GeoJSON coordinate order as `[longitude, latitude]` and normalize for the mapping library at the boundary. Preserve original point geometry and precision. These points are approximate reported locations; they are not customer addresses or outage-boundary polygons. If the feed later changes geometry type, archive it and flag the schema change before publishing unsupported geometry.
 
 For spatial trends, aggregate reported point locations into a versioned grid of roughly 1 km cells, with consistent projected boundaries. Store the grid definition once. Label results as “reported outage activity near this location.” Do not infer service areas from marker circles or claim all affected customers reside inside a point's grid cell. Neighborhood/ZIP summaries can follow if trustworthy boundaries are selected; counts without customer-population denominators are not neighborhood reliability rates.
+
+The implemented per-capita view uses 2020–2024 ACS B01003 population estimates, margins of error and matching 2024 Census block groups; see [reference provenance](reference/README.md). It reports provisional events or peak simultaneous customers per 1,000 estimated residents. Utility accounts are not people, and approximate outage points may represent accounts across boundaries. These are location-based normalized counts, not official reliability rates or resident outage percentages. For older analyses, retain the population/boundary vintage and explicitly label any fixed modern denominator applied to earlier years.
+
+Weather alignment must preserve its native precision. Join each radar frame to an eligible outage observation with both timestamps and the offset visible. Default replay to the latest available frame at or before the selected time, with a small product-specific tolerance established during source validation; never silently fall back to live imagery or an arbitrarily old frame. Distinguish a rainfall accumulation's start/end from a radar instant. Backward-looking weather windows must end at the analysis time, not include future rainfall.
+
+Aggregate rainfall over an area's intersection with valid weather pixels and report coverage; a small block group does not gain finer-than-radar measurements. Keep station readings regional unless an explicit, validated interpolation is added. Preserve legacy grid polygons for weather joins; do not assign their customer totals to modern block groups by centroid or assume uniform distribution. Compare source formats separately unless a documented coarser common geography and compatible metric exist.
 
 ## 7. Trends and anomaly detection
 
@@ -244,18 +286,41 @@ Separate source/data-quality anomalies from electrical-outage anomalies. Unexpec
 
 Do not publish SAIDI/SAIFI or unique households affected from this feed. Those require identities, denominators, and interruption histories that these public snapshots do not establish.
 
+### Weather associations — Phase 5
+
+Use descriptive, reproducible comparisons before fitting a predictive model. A spatial or temporal association is not a verified outage cause. Rain, wind, vegetation, network layout and other factors may coincide; do not assign causal labels to individual outages from a weather overlay.
+
+- Define an episode and comparison window explicitly. Show outages already present at its start separately from newly reported events. Preserve first-observed versus source-reported start-time uncertainty and the existing provisional identity rules.
+- Compare rain during the episode, preceding 1/24/48/72-hour accumulation, temperature and gust observations, and relevant documented hazards. Use specified lag windows, initially concurrent and preceding 1/6/24 hours where supported; version choices and avoid selecting only the lag that looks strongest afterward.
+- Measure distinct provisional events, observed peak customers and customer-hours (`customer-minutes / 60`), including area-level burden only where spatial data supports it. Keep the existing gap rules and end integration at the last trustworthy observation. Report joint weather/outage coverage rather than treating unavailable weather or outage data as zero.
+- Support heavy rain, prolonged rainfall, flash-flood episodes, strong wind, snow, ice/freezing rain, heat waves and cold as overlapping condition tags. Preserve whether a label comes from an observation, warning, finalized event record or a documented derived rule. Rainfall alone does not establish a flash flood; below-freezing temperature alone does not establish ice accumulation.
+- Compare areas exposed to similar weather severity/duration and suitable season/time baselines. Show per-episode counts and burden, exposure hours, event counts and population denominators; avoid ranking vulnerability from an unadjusted all-time outage count or applying a single station's gust to every neighborhood as local truth.
+- Display sparse conditions as descriptive case studies. Show the number of independent episodes and completeness; choose and document sample/coverage thresholds before publishing comparative rankings, and use uncertainty intervals once there are enough independent episodes. A single storm or partial season cannot establish a stable neighborhood ranking.
+
+Weather-condition thresholds, station selection, lag tolerances and statistical sufficiency are implementation/validation decisions to document, not questions the user must answer before work can begin. Begin with rainfall and wind, then winter conditions and heat; a named user-priority storm can change that order.
+
 ## 8. A deliberately small dashboard
 
 Use plain TypeScript with a small build setup, [Leaflet for GeoJSON maps](https://leafletjs.com/examples/geojson/), and [Chart.js for time-series charts](https://www.chartjs.org/docs/latest/). Keep the initial UI to one responsive page:
 
-1. A freshness line and cards for affected customers, active reported outages, change, and daily peak.
+1. A freshness line and compact inline totals for affected customers, active reported outages, change, and daily peak.
 2. A map and time slider. Start at the latest accepted capture; allow selecting an actual historical observation. Size markers by affected customers and show start/status/repair estimate in a popup.
 3. One main line chart with customers/outage-count toggle, 24-hour / 7-day / 30-day presets, visible gaps, and anomaly markers.
 4. A small list of long-running outages or recurring-location rankings, plus CSV/GeoJSON export for the selected bounded period.
 
-Selecting a chart point updates the map to that observation when its detail is cloud-resident. Show the exact selected timestamp and avoid blending “latest” cards with an older map. Use five-minute observations for short ranges and hourly/daily summaries for long ranges, preserving bucket peaks so short spikes remain visible. Load an older map on demand; do not download an entire year of features to the browser. For PC-only detail, display its archive status and available summary instead of an empty map or a fabricated point layer. Legacy maps use the old grid representation and carry a visible source-format label.
+Retain the user's visual direction: ggplot `theme_minimal` aesthetics, visuals before prose, Inter or an equivalent readable font, no emojis, plain drawn SVG previous/next arrows, and a minimum 16 CSS px (12 pt) for interface text. Use a map-led utility layout with concise legends and expandable Data notes; avoid decorative cards, shadows, badges and unrelated animation. The implemented map choices are **One capture**, **Heatmap**, and **Per capita**, with outage-event/peak-customer measures and a bounded map period.
+
+Selecting a chart point updates the map to that observation when its detail is available to the serving archive. Show the exact selected timestamp and avoid blending “latest” totals with an older map. Use five-minute observations for short ranges and hourly/daily summaries for long ranges, preserving bucket peaks so short spikes remain visible. Load an older map on demand; do not download an entire year of features to the browser. For a future cloud dashboard whose requested detail has moved to the PC, display its archive status and available summary instead of an empty map or a fabricated point layer. Legacy maps use the old grid representation and carry a visible source-format label.
 
 The map library and basemap tiles are separate dependencies. For a small personal pilot, standard OpenStreetMap tiles may be used subject to its visible attribution, referrer, and caching requirements. Do not bulk-download or prefetch tiles. Keep the tile provider configurable and let the outage layer remain usable if tiles are unavailable. Reassess the basemap for public traffic. [OSM tile policy](https://operations.osmfoundation.org/policies/tiles/)
+
+### Weather replay and comparison controls
+
+In Phase 3A add a weather-layer selector (off, radar reflectivity, supported rainfall accumulations), opacity control and a concise legend with units and exact weather time/interval. The existing capture slider and drawn arrows synchronize outage and radar replay; an optional explicit play/pause control advances time only when requested. Keep black outage points readable over colored weather imagery. When comparing rainfall and outage heatmaps, offer synchronized side-by-side maps instead of mixing two indistinguishable color scales; stack the synchronized views on phones.
+
+Add an explicit storm-period selector. A single radar frame is compared with its matched outage capture, while period summaries compare outages and rainfall over compatible stated intervals. An antecedent rainfall layer must be labeled as preceding the episode. Do not overlay one storm's rain on the all-time outage heatmap without changing or clearly separating the outage period. Show missing weather independently and keep outage replay usable when weather fails.
+
+Phase 5 adds condition/episode filters, aligned weather/outage timelines, and a compact area-by-condition comparison view for frequency and customer-hours, with per-capita and exposure context where valid. Keep attribution, population/weather vintages, uncertainties and methods available in Data notes and exports.
 
 Proposed read-only API:
 
@@ -264,9 +329,12 @@ GET /api/latest
 GET /api/series?from=...&to=...&resolution=...
 GET /api/snapshots?date=YYYY-MM-DD
 GET /api/snapshot/<snapshot-id>
-GET /api/spatial-summary?from=...&to=...
+GET /api/series?view=spatial&from=...&to=...&geography=grid|block-group
+GET /api/config?view=census
 GET /api/health
 ```
+
+Weather API additions in Phase 3A should expose a bounded product/coverage manifest and allowlisted timestamped images or numeric summaries; Phase 5 adds bounded episode/comparison reads. Final route names are implementation details. Never accept an arbitrary upstream URL or let a viewer request launch unbounded downloads/processing. Preserve current authentication for temporary previews; a future public deployment needs its own quota, attribution and cache review.
 
 Validate date ranges, cap response sizes, and require a coarse resolution for long chart ranges. Cache current responses briefly (about 60 seconds) and immutable snapshots longer. Return source attribution, quality flags, and capture times consistently. Escape source strings in popups. Keep database bindings, storage credentials, and administrative operations out of the browser.
 
@@ -303,6 +371,8 @@ R2 requires a subscription checkout and bills usage above its allowance; “free
 
 Set usage alerts at 70% and 90%, bound public queries/exports, shorten diagnostic-log retention, and review storage growth after the pilot. Cache immutable history and recent series to protect the shared free API/database quotas, and enforce public request budgets so unexpected traffic cannot consume ingestion capacity unchecked. Prefer reducing viewer/maintenance load before collection. A free-first target is not a provider spending cap: keep R2's usage-based billing visible and trigger the desktop process early. Do not silently drop history or downgrade to intervals longer than 15 minutes.
 
+The outage-only estimates above do **not** include weather imagery, numeric grids, historical backfill, raster decoding or analysis. Phase 3A measures those separately using selected local areas/periods; do not assume weather fits inside the existing cloud allowance. Serve cached/precomputed results to viewers and isolate weather work from the five-minute outage collector. No paid weather subscription or additional cloud commitment is selected by this plan.
+
 ## 10. Implementation sequence and acceptance criteria
 
 ### Phase 1: establish the source contract
@@ -315,7 +385,7 @@ Set usage alerts at 70% and 90%, bound public queries/exports, shorten diagnosti
 - Verify source field meanings, timezone assumptions, ID stability, and completeness checks; compare the feed total with the HTML summary using independently recorded times.
 - Measure payload bytes, compression, and Worker CPU on ordinary, 4,000-feature, and 10,000-feature inputs. The first stress case reflects the observed legacy peak; the larger is a headroom probe, not a prediction of maximum storms.
 - Confirm that the protected year plus at least 30 days of offline-PC headroom, transfer staging, and cleanup grace fits free storage under the chosen cadence and storm model. Evaluate free-tier compute alternatives if Workers fails its CPU target.
-- Select the archive directory/disk capacity and five- versus one-minute cadence. Audience, indefinite-detail intent, free-first priority, and irregular PC availability with 30 days of headroom are already settled.
+- Validate the provisional five-minute cadence and storage model against measured captures. The provisional archive directory is recorded above; its installation capacity check belongs to Phase 4B. Audience, indefinite-detail intent, free-first priority, and irregular PC availability with 30 days of headroom are already settled.
 
 **Exit:** the selected free-tier runtime can archive and process the supported payload range with headroom, and a year's storage fits the measured free budget with archive reserve. If either fails, revise the free architecture/cadence before selecting a paid option. The $0 design is not accepted solely because a quiet-day sample works.
 
@@ -332,22 +402,60 @@ Set usage alerts at 70% and 90%, bound public queries/exports, shorten diagnosti
 
 ### Phase 3: dashboard and descriptive analysis
 
-**Local implementation completed September 16, 2026:** see [Phase 3 status](reports/PHASE3_STATUS.md). The loopback dashboard provides linked historical maps/cards/charts, bounded exports, explained anomaly rules and coverage indicators, with 45 passing tests and desktop/mobile-viewport checks. It reads the active local archive while the earlier pilots continue. The user requested a check-in after this step. Public cloud serving/authentication and provider validation remain deferred; Phase 4 has not started.
+**Local implementation completed September 16, 2026:** see [Phase 3 status](reports/PHASE3_STATUS.md). The loopback dashboard provides linked historical maps/totals/charts, a historical density heatmap, Census block-group per-capita maps, bounded exports, explained anomaly rules and coverage indicators. The latest checkpoint has 67 passing tests and desktop/mobile-viewport checks; dashboard changes were committed and pushed in `f9c42e3`. It reads the local archive while the earlier pilots continue. The temporary authenticated phone preview was separately authorized with an explicit expiry; permanent cloud serving and provider validation remain deferred. Weather and Phase 4 have not started.
 
 - Build the one-page dashboard, time-linked map/chart, historical retrieval, and bounded exports.
 - Add the simple anomaly rules with visible explanations and coverage flags. Enable the robust baseline only after enough history exists.
-- Keep viewer access public and verify that archive/admin authentication cannot be bypassed by public routes or cached responses.
+- Preserve historical heatmap and Census per-capita views, provisional event identity, uncertainty and coverage semantics.
+- For eventual production serving, verify that archive/admin authentication cannot be bypassed by public routes or cached responses. Keep current local/temporary-preview access as authorized.
 
-**Exit:** selecting a cloud-resident timestamp reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history.
+**Exit:** selecting a timestamp available to the serving archive reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history. Repeat these checks against cloud-resident data when cloud validation resumes.
+
+### Phase 3A: local weather sources, radar replay and rainfall history
+
+**Status: planned.** This is the recommended next weather implementation step. It depends on the local Phase 3 archive/replay interface, not cloud deployment, completion of desktop transfer, or a legacy import. Planning this stage does not start it.
+
+- Validate the documented radar, MRMS, station and event/warning sources with bounded samples. Confirm actual archive coverage, valid-time conventions, projections, units, quality flags, product versions and reuse/caching conditions; record source manifests.
+- Implement isolated weather retrieval, bounded local caches and numeric subset storage with checksums, retries and availability reporting. Weather failures must leave outage collection and replay intact.
+- Add synchronized historical radar, opacity/legend controls and supported preceding rainfall totals. Label reflectivity separately from estimated rain depth, and display exact matched times/intervals and missing data.
+- Add storm-period selection and synchronized rainfall/outage map comparison. Support the current archive first; do not require historic weather to be captured prospectively alongside each outage poll.
+- Add a compact regional weather timeline using stations with adequate coverage, including temperature, wind/gusts and available precipitation-type observations. Retain event/warning context with explicit provenance; comprehensive condition comparisons remain Phase 5.
+- Validate wet/dry periods, a frozen-precipitation example for interpretation/quality handling, a source outage, timestamps around DST and a multi-day rainfall window. Historical weather-only examples must not invent matching outage records.
+
+**Exit:** selected outage captures and storm windows reproduce eligible weather images/numeric summaries with explicit timestamps, units, native resolution and coverage; missing frames cannot look like confirmed dry weather. Regional station data keeps its location/quality flags. Desktop and phone controls remain readable, weather storage/work stays bounded, and collector continuity is unaffected. Report a local checkpoint before broadening implementation scope.
 
 ### Phase 4: legacy history and desktop retention
 
+Split this phase into independent tracks so weather analysis can use older local outages without waiting for cloud retention work.
+
+#### Phase 4A: legacy history import
+
 - Import deduplicated legacy total-count observations and supported grid snapshots through a separate versioned adapter. Preserve original RDS/RData files and provenance; do not run the old scraper or copy its credentials/configuration into the new deployment.
 - Populate historical storm comparisons with the measured 2022–2025 observations, explicitly marking gaps, unavailable geometry, and source-format differences. Do not assume the current checkout contains every older raw file referenced by the consolidated data.
+- Audit totals and spatial coverage independently, reconcile timestamp/DST conventions, and expose the original grid geometry. Pair verified legacy periods with Phase 3A weather; total-only periods support regional comparisons only. Weather backfill does not fill outage gaps.
+
+**Exit:** imported observations reproduce the preserved legacy totals and supported geometry without duplicated events, fabricated locations or hidden coverage gaps. Current-feed and legacy measures remain distinguishable. This local track can feed Phase 5 independently of Phase 4B.
+
+#### Phase 4B: verified desktop transfer and cloud retention
+
+**Deferred until cloud work is resumed.** This track depends on a validated cloud archive and the later desktop installation decisions; it is not a prerequisite for local weather replay or analysis.
+
 - Install the Windows archive downloader, receipt protocol, cloud archive catalog, and pressure-triggered cleanup. Keep detailed historic maps available in the cloud while capacity permits.
 - Exercise offline/resumed downloads, a full disk, corrupted parts, duplicate receipts, protected-year boundaries, and restoration of a transferred historical map before enabling cloud cleanup.
 
 **Exit:** every removed cloud payload has a verified, readable desktop copy; the newest year stays cloud-resident; public charts retain long-term summaries and accurately identify PC-only detail.
+
+### Phase 5: weather-condition comparisons and historical case studies
+
+**Status: planned.** Depends on Phase 3A weather and verified outage coverage. Phase 4A is required for legacy-period comparisons; sufficiently observed current-format episodes can be analyzed without it. Phase 4B and permanent cloud hosting are independent.
+
+- Define and version episode boundaries, condition labels, lags, reference periods and joint coverage rules. Include heavy/prolonged rainfall, flash-flood episodes, wind, snow, ice/freezing rain, heat waves and cold without treating warning/derived labels as observed damage.
+- Join native-resolution weather to the current point/grid history and the separate legacy polygons. Preserve Census population vintages and margins of error; do not redistribute legacy area customer totals into block groups without support.
+- Compute newly reported event frequency, observed customer-hours and peaks over matched weather/outage periods, with exposure hours, per-capita context, existing-outage carryover and uncertainty. Apply the existing interruption-burden gap rules.
+- Build condition/episode filters, aligned time-series comparisons, and area-by-condition maps or a compact comparison matrix. Start with rainfall/wind case studies, then winter and heat episodes as verified coverage allows.
+- Validate results against saved inputs and manually checked cases. Test exposure-matched comparisons, sparse categories, multi-hazard episodes, denominator/vintage changes and the October 2020 MRMS product transition where relevant. Keep incompatible source formats separate.
+
+**Exit:** a saved comparison is reproducible from its source manifests and metric versions; maps and summaries show weather/outage coverage, native resolution, population vintage and sample size. Sparse data remains a case study, and findings are presented as associations rather than verified causes or official utility reliability measures.
 
 ### Required verification
 
@@ -357,5 +465,21 @@ Set usage alerts at 70% and 90%, bound public queries/exports, shorten diagnosti
 - Analytics cases: unchanged observations, genuine zero, suspicious empty feed, an outage disappearing/reappearing, partial coverage, and correct customer-minute bucket boundaries.
 - Operational checks: storm-size resource use, cost telemetry, stale-data banner and heartbeat detection, public-read quota protection, and a restore/replay exercise from archived data.
 - Retention checks: desktop offline for 30 days under the storage-growth model, successful catch-up after it returns, partial downloads/deletions, checksum mismatch, expired machine credentials, payloads shared with protected observations, and preventing cleanup without a matching verified receipt.
+- Weather source/time cases: unavailable versus dry pixels, invalid/late frames, matched-time tolerances, UTC/Central/DST, trace/missing precipitation, rate/depth unit conversion, rolling accumulation overlap, product revisions and failed numeric downloads.
+- Weather spatial/analysis cases: raster CRS and partial-cell overlap, no extrapolation of station precision, legacy-grid versus current-point joins, incomplete joint coverage, interval-bounded event onset, carried-over outages, lag windows, overlapping hazard labels, exposure normalization, sparse independent episodes and reproducible saved comparisons.
+- Weather operations/UI: isolated download/processing budgets, archive retention changes, cache misses without live-data substitution, no arbitrary upstream fetches, wet multi-day resource use, map-layer legends/opacity, synchronized views and phone layout, and proof that weather failures do not disrupt outage capture.
 
-Future additions should be driven by use: one-minute storm collection, weather overlays, better geographic comparisons, or notifications. Indefinite detailed retention with verified desktop offload is part of the planned system, not an optional future extension. Preserve the small dashboard and reliable collection path as the core of the project.
+Future optional additions should be driven by use: one-minute storm collection, more detailed geographic comparisons, or notifications. Weather replay/analysis now has explicit planned stages. Indefinite detailed retention with verified desktop offload remains part of the planned production system. Preserve the small dashboard and reliable collection path as the core of the project.
+
+## 11. Open decisions and questions for the owner
+
+**No blocking user answers are needed to complete this plan or prepare the next local weather step.** The local-only constraint, free-first priority, Memphis/Shelby County scope, five-minute provisional cadence, retention intent, visual style and requested weather categories already provide enough direction. Both outage-event and peak-customer per-capita measures are implemented, so their default/toggle choice is not an unresolved requirement.
+
+| Decision | Needed now? | Default or trigger |
+| --- | --- | --- |
+| Specific storms or weather categories to prioritize | Optional | Start with rainfall/wind, then snow/ice and heat; use verified legacy episodes after Phase 4A. A named event or date range can change the order. |
+| When to resume cloud deployment or start another temporary remote preview | No; currently deferred | Keep local validation and the existing preview's original expiry. Review concrete deployment/preview scope only when requested. |
+| Final long-term archive directory, available disk budget and any second copy | No; needed for Phase 4B installation | The local trial uses `C:\Developer\mlgw-outage-scraper\data`; the provisional future archive is `C:\Developer\mlgw-outage-scraper\archive` with a 20 GB free-space floor. Recheck capacity and confirm the installation destination at that stage. |
+| Any paid service if measured requirements cannot fit free resources | No; no payment is authorized | Exhaust suitable free options and report the concrete capacity tradeoff before a spending decision. |
+
+Provider availability, station choice, weather thresholds, geographic joins, sufficient sample size and runtime/storage performance are research and validation work for the implementation, not questionnaires to hand back to the owner. Starting a subsequent stage remains a separate instruction from updating this design plan.
