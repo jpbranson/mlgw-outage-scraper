@@ -50,6 +50,18 @@ main { max-width: 1680px; padding: 22px 28px 16px; margin: auto; }
 .map-panel { grid-row: span 2; }
 .panel-heading { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 44px; margin-bottom: 6px; }
 .map-wrap { position: relative; }
+.weather-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 20px; margin-bottom: 10px; }
+.weather-controls label, .station-weather label { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.weather-controls select, .station-weather select { font: inherit; color: inherit; background: #fff; border: 1px solid #999; border-radius: 0; padding: 6px 8px; max-width: 100%; }
+#weather-opacity, #rainfall-opacity { width: 110px; }
+.weather-status { margin-top: 8px; }
+.weather-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; color: var(--muted); }
+.weather-legend > span { display: inline-flex; align-items: center; gap: 4px; }
+.weather-legend i { width: 18px; height: 18px; border: 1px solid #888; }
+.station-weather { margin-top: 16px; border-top: 1px solid var(--line); }
+.station-weather summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
+.station-weather p, .station-weather label { margin: 8px 0; }
+.station-chart-wrap { position: relative; height: 200px; margin: 12px 0; }
 #map { height: 520px; background: #fff; z-index: 1; }
 .leaflet-tile-pane { filter: grayscale(1); }
 .map-notice { position: absolute; z-index: 500; top: 10px; left: 66px; right: 10px; background: #fff; border: 1px solid #985430; padding: 8px 10px; }

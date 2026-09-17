@@ -1,8 +1,8 @@
 # Phase 1 checkpoint: source contract and free-hosting feasibility
 
-Updated September 16, 2026. **In progress; the Phase 1 exit gate has not passed.** A 24-hour local pilot is running. Cloud deployment has not occurred, and there are no configured Cloudflare credentials on this PC. No paid services or production resources were created.
+Source/feasibility checkpoint recorded September 16, 2026; documentation reconciled September 17. **The full Phase 1 exit gate has not passed.** Measurements below describe the dated source checkpoint. See [current project status](PROJECT_STATUS.md) for the latest trial and deployment checks. The 24-hour pilot was still running at the September 17 audit; temporary Quick Tunnel access is now deployed, while production cloud resources and provider-runtime validation remain deferred.
 
-**Current scope, confirmed by the user September 16:** keep validation local for now. Continue the existing public-feed observation pilot, local parser/replay tests, storm benchmarks and storage modeling. Cloud account setup, deployment and provider-runtime tests are deferred until the user asks to resume them. The next check-in should report the local results and identify deferred cloud evidence without requesting an account connection again.
+**Validation scope, confirmed by the user September 16:** continue the public-feed observation pilot, local parser/replay tests, storm benchmarks and storage modeling. Permanent cloud account setup/deployment and provider-runtime tests remain deferred. The separately requested temporary Quick Tunnel does not establish provider CPU/storage feasibility. The next source-pilot check-in should report local results and deferred cloud evidence without requesting an account connection again.
 
 The user's subsequent request to proceed with the next step authorized local Phase 2 implementation while this pilot continues. See [PHASE2_STATUS.md](PHASE2_STATUS.md). This does not change the cloud deferral or mark Phase 1 accepted.
 
@@ -42,7 +42,7 @@ Reviewed the public [map description](https://www.mlgw.com/outagemap/), [live ma
 
 The pilot started **September 16 at 11:37:51 AM Central** and is scheduled to take its last observation on/after **September 17 at 11:37:51 AM**, normally the 11:40 slot. Its first capture succeeded with matching feed/HTML totals and no validation flags. It runs on this PC, so sleep/shutdown or network loss can leave gaps. Power settings have not been changed. Raw evidence and state are under `data/pilot/`; run `npm run analyze` for current coverage.
 
-A one-time review in this conversation is scheduled for **September 17 at 12:15 PM Central** (automation `review-mlgw-phase-1-pilot`). The computer and Codex app must be running for that local review. See [the scheduled-task documentation](https://learn.chatgpt.com/docs/automations?surface=app). It will review the Phase 1 observations and the now-authorized local Phase 2 trial, then check back without advancing to Phase 3 or cloud deployment.
+A one-time review in the existing Codex thread is scheduled for **September 17 at 12:15 PM CDT** (automation `review-mlgw-phase-1-pilot`, configuration verified active September 17). The computer and Codex app must be running for that local review. See [the scheduled-task documentation](https://learn.chatgpt.com/docs/automations?surface=app). Its current instructions review the Phase 1 observations, local Phase 2 trial and already implemented Phase 3 dashboard, then check back without starting Phase 4 or deploying additional resources.
 
 ## Measured payloads and local processing
 
@@ -95,7 +95,7 @@ Selected local pilot/evidence location: `C:\Developer\mlgw-outage-scraper\data`.
 
 1. Finish at least 24 hours of observations at five-minute resolution; evaluate actual gaps, meaningful changes, ID behavior, timezone consistency and HTML discrepancies.
 2. Replace quiet-day assumptions with pilot size distributions, check local replay and refine the storage/headroom estimate.
-3. Report local findings, remaining source uncertainty and provisional runtime/cadence choices alongside the authorized local Phase 2 trial; check back before advancing to the dashboard or cloud deployment.
+3. Report local findings, remaining source uncertainty and provisional runtime/cadence choices alongside the ongoing local Phase 2 trial. The dashboard and weather checkpoints have since been implemented under subsequent requests; this source review does not itself authorize another implementation phase or permanent cloud deployment.
 
 ## Deferred cloud gates
 

@@ -28,7 +28,7 @@ async function setup(t, options = {}) {
 test('unauthenticated clients receive only the password page; assets, exports and all API reads are protected', async t => {
   const { base, calls } = await setup(t);
   const root = await fetch(base); assert.equal(root.status, 200); assert.match(await root.text(), /Preview password/);
-  for (const path of ['/app.js', '/app.css', '/api/health', '/api/latest', '/api/export.csv', '/api/export.geojson?id=a', '/data/collector/index.sqlite']) {
+  for (const path of ['/app.js', '/app.css', '/api/health', '/api/latest', '/api/weather?at=2026-09-17T04:00:00Z', '/api/weather/image/'+'a'.repeat(64), '/api/weather/periods', '/api/weather/period?id='+'a'.repeat(64), '/api/export.csv', '/api/export.geojson?id=a', '/data/collector/index.sqlite']) {
     const response = await fetch(base + path); assert.equal(response.status, 401, path); assert.doesNotMatch(await response.text(), /321/);
     assert.match(response.headers.get('cache-control'), /no-store/);
   }
@@ -48,6 +48,11 @@ test('valid password establishes a secure session and forwards only permitted re
   for (const path of ['/data/collector/index.sqlite', '/api/admin', '/.env', '/archive/manifests/a.json'])
     assert.equal((await fetch(base + path, { headers: { Cookie: cookie } })).status, 404);
   assert.equal(calls.length, 1);
+  for(const path of ['/api/weather?at=2026-09-17T04:00:00Z','/api/weather/image/'+'a'.repeat(64),'/api/weather/periods','/api/weather/period?id='+'a'.repeat(64)])
+    assert.equal((await fetch(base+path,{headers:{Cookie:cookie}})).status,200);
+  assert.equal((await fetch(base+'/api/weather/image/not-a-hash',{headers:{Cookie:cookie}})).status,404);
+  assert.equal((await fetch(base+'/data/weather/cache/published/catalog.json',{headers:{Cookie:cookie}})).status,404);
+  assert.equal(calls.length,5);
 });
 test('wrong passwords, forged cookies and cross-origin requests cannot reach data', async t => {
   const { base, login, calls } = await setup(t);

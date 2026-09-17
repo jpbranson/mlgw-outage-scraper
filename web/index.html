@@ -16,7 +16,7 @@
     </header>
     <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">Retry</button></div>
     <div class="map-toolbar">
-      <div class="segmented" aria-label="Map view"><button data-map-view="capture" aria-pressed="true">One capture</button><button data-map-view="history" aria-pressed="false">Heatmap</button><button data-map-view="percapita" aria-pressed="false">Per capita</button></div>
+      <div class="segmented" aria-label="Map view"><button data-map-view="capture" aria-pressed="true">One capture</button><button data-map-view="history" aria-pressed="false">Heatmap</button><button data-map-view="percapita" aria-pressed="false">Per capita</button><button data-map-view="rainfall" aria-pressed="false">Rainfall</button></div>
       <label id="map-period-label" hidden>Map period <select id="map-period"><option value="available">Available history</option><option value="0.25">Last 6 hours</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
       <label id="map-measure-label" hidden>Measure <select id="map-measure"><option value="events">Outage events</option><option value="customers">Peak customers affected</option></select></label>
     </div>
@@ -34,7 +34,23 @@
     <div class="visual-grid">
       <section class="panel map-panel" aria-labelledby="map-heading">
         <div class="panel-heading"><h2 id="map-heading">Reported locations</h2><button id="fit-map" class="button-quiet">Reset map</button></div>
+        <div id="rainfall-controls" class="weather-controls" hidden>
+          <label>Rainfall period <select id="rainfall-hours"><option value="24">24 hours</option><option value="48">48 hours</option><option value="72" selected>72 hours</option></select></label>
+          <label>Ending <select id="rainfall-ending" aria-label="Rainfall ending time"></select></label>
+          <label>Opacity <input id="rainfall-opacity" type="range" min="10" max="90" step="10" value="60" aria-label="Rainfall opacity"><output id="rainfall-opacity-value">60%</output></label>
+          <button id="rainfall-retry" class="button-quiet">Reload periods</button>
+        </div>
+        <div id="weather-controls" class="weather-controls">
+          <label>Weather <select id="weather-layer"><option value="off">Off</option><option value="radar">Radar reflectivity</option><option value="rainfall">One-hour rainfall</option></select></label>
+          <label id="weather-opacity-label" hidden>Opacity <input id="weather-opacity" type="range" min="10" max="90" step="10" value="60" aria-label="Weather opacity"><output id="weather-opacity-value">60%</output></label>
+          <button id="weather-retry" class="button-quiet" hidden>Retry weather</button>
+        </div>
         <div class="map-wrap"><div id="map" aria-label="Approximate reported outage points"></div><div id="map-notice" class="map-notice" role="status" hidden></div></div>
+        <p id="weather-status" class="weather-status" role="status" hidden></p>
+        <div id="weather-legend" class="weather-legend" hidden></div>
+        <p id="rainfall-status" class="weather-status" role="status" hidden></p>
+        <div id="rainfall-legend" class="weather-legend" hidden></div>
+        <p id="rainfall-coverage" class="weather-status muted" hidden></p>
         <div class="map-key"><span id="map-circles" class="legend-circles" aria-hidden="true"><i></i><i></i><i></i></span><span id="map-key-label">Size = customers affected</span></div>
         <div id="map-scale" class="map-scale" hidden></div>
         <p id="census-caption" class="muted census-caption" hidden>Block groups · <a href="https://data.census.gov/table/ACSDT5Y2024.B01003" target="_blank" rel="noopener noreferrer">2020–2024 ACS population</a><br>Approximate location-based rates, not the share of people without power.</p>
@@ -43,6 +59,12 @@
           <div class="slider-row"><button id="previous" aria-label="Previous capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Historical capture" disabled><button id="next" aria-label="Next capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
           <div class="slider-labels"><span id="first-time">—</span><span id="slider-time">No capture selected</span><span id="last-time">—</span></div>
         </div>
+        <details id="station-weather" class="station-weather"><summary>Memphis airport weather</summary>
+          <p id="station-summary">Select an outage capture.</p>
+          <label>History <select id="station-metric"><option value="temperature">Temperature (°F)</option><option value="wind">Wind and gusts (kt)</option></select></label>
+          <div id="station-chart-wrap" class="station-chart-wrap"><canvas id="station-chart" role="img" aria-label="Memphis airport observations during the 24 hours before the selected outage capture"></canvas></div>
+          <p id="station-coverage" class="muted"></p><p class="muted">Regional airport conditions · as reported, without additional quality control · <a href="https://mesonet.agron.iastate.edu/request/download.phtml?network=TN_ASOS" target="_blank" rel="noopener noreferrer">IEM / NWS METAR</a></p>
+        </details>
       </section>
       <section class="panel chart-panel" aria-labelledby="chart-heading">
         <div class="panel-heading"><h2 id="chart-heading">History</h2><span id="chart-zone" class="muted">Central time</span></div>
@@ -61,6 +83,7 @@
           <dl id="capture-notes"><dt>Selected capture</dt><dd id="selected-note">Times shown in Central time unless labeled UTC.</dd><dt>Customer change</dt><dd id="change-note">Comparable observations only</dd><dt>Daily customer peak</dt><dd id="peak-note">Observed through selected capture</dd><dt>Archive day</dt><dd id="capture-count">— captures</dd><dt>Sharp increase</dt><dd id="rise-copy">Checking comparable captures…</dd><dt>Historical baseline</dt><dd id="baseline-copy">Requires 28 days with at least 90% valid coverage.</dd><dt>Long outages</dt><dd id="long-note">Duration is based on the source start time.</dd></dl>
           <dl><dt>Chart</dt><dd id="series-note">Select a chart point to inspect its captured map.</dd><dt>Coverage</dt><dd id="quality-note">Missing observations are unknown; gaps are never counted as zero.</dd></dl>
           <p>Approximate points, not addresses or boundaries. Source times assume Central. Capture time is retrieval time; source publication time is unknown.</p>
+          <p id="weather-notes">Weather follows the selected capture. Missing weather remains unknown.</p>
         </div></details>
     </section>
     <footer><span>Independent local archive</span><a href="https://outagemap.mlgw.org/OutageSummary.php" target="_blank" rel="noopener noreferrer">Official MLGW outage map</a></footer>

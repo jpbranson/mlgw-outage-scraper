@@ -4,7 +4,7 @@ import { extname, resolve, relative, isAbsolute } from 'node:path';
 import { RequestError } from './service.mjs';
 
 export function createDashboardServer(service, { staticRoot, tiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120 } = {}) {
+  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120, weather } = {}) {
   const tileOrigin = tiles ? new URL(tiles).origin : '';
   if (tiles && !tiles.startsWith('https://')) throw new Error('Tile URL must use HTTPS, or be empty to disable tiles.');
   let windowStart = 0, requests = 0;
@@ -27,6 +27,10 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
       if (path.startsWith('/api/')) {
         if (Date.now() - windowStart >= 60000) { windowStart = Date.now(); requests = 0; }
         if (++requests > requestLimit) { res.setHeader('Retry-After', '60'); throw new RequestError('Local request budget reached. Retry in one minute.', 429); }
+        if (path === '/api/weather' && weather) return send(200, weather.at(url.searchParams));
+        if (path === '/api/weather/periods' && weather) return send(200, weather.periods(url.searchParams));
+        if (path === '/api/weather/period' && weather) return send(200, weather.period(url.searchParams));
+        if (path.startsWith('/api/weather/image/') && weather) return send(200, weather.image(path.slice(19)), 'image/png', 'private, max-age=86400, immutable');
         if (path === '/api/config') return url.searchParams.get('view') === 'census'
           ? send(200, service.censusAreas().data, undefined, 'private, max-age=86400')
           : send(200, { tiles, attribution, attributionUrl });

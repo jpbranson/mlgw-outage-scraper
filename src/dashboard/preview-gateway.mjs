@@ -26,7 +26,7 @@ async function formBody(req) {
   }
   return new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
 }
-const permitted = path => /^\/(?:|index\.html|app\.(?:js|css)|assets\/[a-zA-Z0-9_.-]+|api\/(?:config|health|latest|series|snapshots|snapshot\/[a-zA-Z0-9_-]{1,120}|export\.(?:csv|geojson)))$/.test(path);
+const permitted = path => /^\/(?:|index\.html|app\.(?:js|css)|assets\/[a-zA-Z0-9_.-]+|api\/(?:config|health|latest|series|snapshots|weather|weather\/(?:periods|period)|weather\/image\/[a-f0-9]{64}|snapshot\/[a-zA-Z0-9_-]{1,120}|export\.(?:csv|geojson)))$/.test(path);
 
 // Deliberately separate from the collector and local dashboard. Only this
 // loopback gateway is pointed at the temporary tunnel; all reads require a session.

@@ -5,6 +5,8 @@ import { HistoryHeatmap } from './heatmap';
 import type { FeatureCollection } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import './style.css';
+import { WeatherControls } from './weather';
+import { RainfallControls } from './rainfall';
 
 Chart.register(...registerables);
 Chart.defaults.font.family = 'Arial, Helvetica, sans-serif';
@@ -37,21 +39,31 @@ const put = (id: string, value: string) => { el(id).textContent = value; };
 const fmt = new Intl.NumberFormat('en-US');
 const time = (value: string | number, date = false) => new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago',
   ...(date ? { month: 'short', day: 'numeric' } as const : {}), hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }).format(new Date(value));
-const chartTime = (value: number) => days === 30 ? new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(value) :
+const chartTime = (value: number) => mapView === 'rainfall' ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric' }).format(value) : days === 30 ? new Intl.DateTimeFormat('en-US', { timeZone: 'UTC', month: 'short', day: 'numeric' }).format(value) :
   days === 7 ? new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', month: 'short', day: 'numeric', hour: 'numeric' }).format(value) :
   new Intl.DateTimeFormat('en-US', { timeZone: 'America/Chicago', hour: 'numeric', minute: '2-digit' }).format(value);
 const dayOf = (value: string) => value.slice(0, 10);
 let selected: Snapshot | null = null, health: Health | null = null, captures: Capture[] = [], series: Series | null = null;
 let followLatest = true, metric: Metric = 'customers', days = 1, snapshotRequest = 0, seriesRequest = 0, dayRequest = 0;
 let activeParams = '', tilesFailed = false, mapMessage = '';
-type MapView = 'capture' | 'history' | 'percapita';
+type MapView = 'capture' | 'history' | 'percapita' | 'rainfall';
 let mapView: MapView = 'capture', spatialRequest = 0;
+let rainfallRange:{from:string;to:string}|null=null;
 let spatialData: SpatialHistory | null = null, censusGeometry: FeatureCollection | null = null;
 let mapMeasure: 'events' | 'customers' = 'events';
 const map = L.map('map', { preferCanvas: true, scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false, markerZoomAnimation: false }).setView([35.14, -89.88], 10);
 map.attributionControl.setPrefix('<a href="https://leafletjs.com" target="_blank" rel="noopener noreferrer">Leaflet</a>');
 const pointsLayer = L.layerGroup().addTo(map);
 const markers = new Map<string, L.CircleMarker>();
+const weather = new WeatherControls(map);
+const rainfall = new RainfallControls(map,range=>{
+  rainfallRange=range?{from:range.from,to:range.to}:null;seriesRequest++;series=null;chart.data.datasets[0].data=[];chart.update('none');
+  put('coverage',range?'Loading matching outage coverage…':'No rainfall period selected');
+  put('quality-note','Outage coverage is loading for the selected rainfall period.');
+  el('chart-empty').hidden=false;put('chart-empty',range?'Loading outage history for this period…':'Select a prepared rainfall period');
+  el('csv').setAttribute('aria-disabled','true');
+  if(range)void loadSeries().catch(error=>{put('chart-empty','Outage history unavailable for this period');showError(error.message);});
+});
 const showError = (message: string) => { put('error-text', message); el('error').hidden = false; };
 const clearError = () => { el('error').hidden = true; };
 async function api<T>(path: string): Promise<T> {
@@ -185,21 +197,30 @@ async function loadSpatial() {
   } finally { if (ticket === spatialRequest) period.disabled = false; }
 }
 function setMapView(view: MapView, load = true) {
-  mapView = view; spatialRequest++;
+  const wasRainfall=mapView==='rainfall';mapView = view; spatialRequest++;snapshotRequest++;dayRequest++;seriesRequest++;
+  pointsLayer.clearLayers();markers.clear();mapNotice('');
+  void weather.select(null,view==='capture');
+  void rainfall.activate(view==='rainfall');
   const history = view !== 'capture';
   for (const id of ['capture-selection', 'capture-totals', 'capture-long-running', 'history-controls', 'capture-signals', 'capture-notes', 'geojson']) el(id).hidden = history;
-  for (const id of ['spatial-summary', 'map-period-label', 'spatial-notes']) el(id).hidden = !history;
+  for (const id of ['spatial-summary', 'map-period-label', 'spatial-notes']) el(id).hidden = !history||view==='rainfall';
   document.querySelectorAll<HTMLButtonElement>('[data-map-view]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mapView === view)));
   el('map-measure-label').hidden = el('census-caption').hidden = view !== 'percapita';
-  el('map-circles').hidden = history; el('map-scale').hidden = !history;
-  put('map-heading', view === 'percapita' ? 'Outages per capita' : history ? 'Historical outage density' : 'Reported locations');
-  el('map').setAttribute('aria-label', view === 'percapita' ? 'Shelby County Census block-group outage rates' : history ? 'Historical reported outage density heatmap' : 'Approximate reported outage points');
+  el('map-circles').hidden = history; el('map-scale').hidden = !history||view==='rainfall';
+  el('map-key-label').parentElement!.hidden=view==='rainfall';
+  document.querySelector<HTMLElement>('.range-buttons')!.hidden=view==='rainfall';
+  document.querySelector<HTMLElement>('.legend-selected')!.parentElement!.hidden=view==='rainfall';
+  put('chart-heading',view==='rainfall'?'Outages in rainfall period':'History');
+  put('map-heading', view==='rainfall'?'Accumulated rainfall':view === 'percapita' ? 'Outages per capita' : history ? 'Historical outage density' : 'Reported locations');
+  el('map').setAttribute('aria-label',view==='rainfall'?'Prepared accumulated rainfall; tap to inspect a native cell': view === 'percapita' ? 'Shelby County Census block-group outage rates' : history ? 'Historical reported outage density heatmap' : 'Approximate reported outage points');
   updateMapLegend();
   el<HTMLSelectElement>('map-period').disabled = false;
   if (load) {
+    if (view==='rainfall')return;
     if (history) void loadSpatial();
     else void selectCapture(followLatest ? undefined : selected?.summary?.id);
   }
+  if(wasRainfall&&view!=='rainfall')void loadSeries().catch(error=>showError(error.message));
 }
 function updateMapLegend() {
   put('map-key-label', mapView === 'percapita' ? `${mapMeasure === 'events' ? 'Reported events' : 'Peak customers affected'} per 1,000 residents` :
@@ -244,6 +265,7 @@ function renderSnapshot(data: Snapshot) {
   put('change-note', s?.previousAt ? `Since ${time(s.previousAt)}` : 'No comparable prior capture');
   put('peak', s ? fmt.format(s.dailyPeak) : '—'); put('peak-note', s ? `${s.peakDay} UTC · through selection` : 'Observed through selected capture');
   renderMap(data); renderNotes(data); syncSlider();
+  void weather.select(s?.capturedAt??null,mapView==='capture');
   const geo = el<HTMLAnchorElement>('geojson');
   if (s && data.detail.available) { geo.href = `/api/export.geojson?id=${encodeURIComponent(s.id)}`; geo.removeAttribute('aria-disabled'); }
   else { geo.removeAttribute('href'); geo.setAttribute('aria-disabled', 'true'); }
@@ -324,16 +346,19 @@ function renderChart() {
   x.min = series.resolution === '5m' ? (series.points[0]?.at ?? series.from) - 60000 : series.from;
   x.max = series.resolution === '5m' ? (series.points.at(-1)?.at ?? series.to) + 60000 : series.to;
   chart.update(); el('chart-empty').hidden = series.observedSnapshots > 0;
-  put('chart-zone', days === 30 ? 'UTC days' : 'Central time');
+  put('chart-zone', mapView!=='rainfall'&&days === 30 ? 'UTC days' : 'Central time');
+  put('chart-empty',mapView==='rainfall'?'No collected outage captures in this rainfall period':'No captures in this period');
   put('series-label', series.resolution === '5m' ? 'Captured totals' : series.resolution === 'hourly' ? 'Hourly peaks' : 'Daily peaks');
   put('series-note', `${series.meaning} Select a point to view its map. Larger triangles mark sharp increases.`);
   put('coverage', `${(series.coverage * 100).toFixed(1)}% time coverage`);
-  put('quality-note', `${fmt.format(series.observedSnapshots)} accepted captures in the requested period. ${series.firstCaptureAt ? `Available history in this window begins ${time(series.firstCaptureAt, true)}. ` : ''}Missing observations are unknown. ${series.quality.length ? series.quality.map(q => `${q.count} ${q.outcome} attempts`).join(' · ') + '. ' : ''}Dashed line: selected capture.`);
+  put('quality-note', `${fmt.format(series.observedSnapshots)} accepted captures in the requested period. ${series.firstCaptureAt ? `Available history in this window begins ${time(series.firstCaptureAt, true)}. ` : ''}Missing observations are unknown. ${series.quality.length ? series.quality.map(q => `${q.count} ${q.outcome} attempts`).join(' · ') + '. ' : ''}${mapView==='rainfall'?'Weather does not imply outage observations for this period.':'Dashed line: selected capture.'}`);
   el<HTMLAnchorElement>('csv').href = `/api/export.csv?${activeParams}`;
+  el('csv').removeAttribute('aria-disabled');
 }
 async function loadSeries() {
+  if(mapView==='rainfall'&&!rainfallRange)return;
   const ticket = ++seriesRequest, to = Date.now();
-  const params = new URLSearchParams({ from: new Date(to - days * 86400000).toISOString(), to: new Date(to).toISOString(), resolution: days === 1 ? '5m' : days === 7 ? 'hourly' : 'daily' }).toString();
+  const params = new URLSearchParams(mapView==='rainfall'?{...rainfallRange!,resolution:'hourly'}:{ from: new Date(to - days * 86400000).toISOString(), to: new Date(to).toISOString(), resolution: days === 1 ? '5m' : days === 7 ? 'hourly' : 'daily' }).toString();
   const data = await api<Series>(`/api/series?${params}`);
   if (ticket !== seriesRequest) return;
   series = data; activeParams = params; renderChart();
@@ -347,7 +372,7 @@ async function refreshHealth() {
   if (health.firstCaptureAt) el<HTMLInputElement>('archive-date').min = dayOf(health.firstCaptureAt);
 }
 async function refresh() {
-  try { await refreshHealth(); await loadSeries(); if (mapView !== 'capture') await loadSpatial(); else if (followLatest && health?.latest?.id !== selected?.summary?.id) await selectCapture(); }
+  try { await refreshHealth(); await loadSeries(); if (mapView === 'history'||mapView==='percapita') await loadSpatial(); else if (mapView==='capture'&&followLatest && health?.latest?.id !== selected?.summary?.id) await selectCapture(); }
   catch (error) { el('freshness').dataset.status = 'stale'; put('freshness-label', 'Local archive connection lost'); showError((error as Error).message); }
 }
 el('latest').addEventListener('click', () => { followLatest = true; void selectCapture(); });

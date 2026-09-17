@@ -1,6 +1,6 @@
 # Phase 2: local durable collection
 
-Updated September 16, 2026. **Local implementation is built and verified; the seven-day collection trial is running.** The original cloud deployment and operating acceptance criteria remain deferred. Phase 1's 24-hour source observation is still in progress. The user's request to proceed authorizes this local Phase 2 work while that observation continues; it does not establish that the earlier cloud feasibility gates passed.
+Implementation checkpoint recorded September 16, 2026; documentation reconciled September 17. **Local implementation is built; the seven-day operating acceptance is still pending.** The 24-hour source pilot and seven-day collector were both active at the [September 17 status check](PROJECT_STATUS.md). Measurements and test counts below are the original Phase 2 evidence, not current totals. Later dashboard/weather implementation and temporary Quick Tunnel access do not pass the deferred production-cloud feasibility gates.
 
 ## Implemented behavior
 
@@ -23,7 +23,7 @@ It checks the current Phase 1 pilot every 30 seconds and indexes completed captu
 
 The PC must remain awake and online. Sleep, shutdown or a stopped process can create gaps; a later run records current observations and reports the missing time. Restarting `npm run collector:run` resumes the existing window, not a new seven-day claim. No Windows power settings were changed.
 
-The check-in on **September 17 at 12:15 PM Central** will review the 24-hour source results and the local durable collector's progress. It will not treat one day of evidence as a completed seven-day reliability trial. Cloud work and Phase 3 remain outside this checkpoint.
+The scheduled check-in on **September 17 at 12:15 PM CDT** will review the 24-hour source results, local durable collector's progress and the already implemented dashboard. It will not treat one day of evidence as a completed seven-day reliability trial. Permanent cloud collection/storage and Phase 4 remain deferred.
 
 ## Verification evidence
 
@@ -51,4 +51,4 @@ The independent status command can detect a stale runner heartbeat; no separate 
 1. Observe the ongoing seven-day run and report real slot coverage, failures, gaps, disk growth and recovery behavior. The target of 99% success and no unexplained gap over 15 minutes has not yet been demonstrated.
 2. Finish the Phase 1 local source-characterization report and refine any provisional timezone/identity/capacity assumptions.
 3. When the user resumes cloud work, implement and validate the selected cloud storage/runtime adapters, separate development/production resources, account quotas and deployment credentials.
-4. Keep production cloud retention/cleanup and verified desktop transfer deferred to their planned phase. Keep the dashboard and public API in Phase 3.
+4. Keep production cloud retention/cleanup and verified desktop transfer deferred to Phase 4B. The local read-only dashboard/API, weather controls and temporary password-protected tunnel are documented in the subsequent dashboard reports and current status.
