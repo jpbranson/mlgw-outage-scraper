@@ -1,0 +1,6 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {assessTrial} from '../src/durable/trial-acceptance.mjs';
+const state={startedAt:'2026-09-16T17:04:02Z',endsAt:'2026-09-23T17:04:02Z',completedAt:'2026-09-23T17:04:03Z'},now=Date.parse(state.completedAt);
+const health={validSlotCoverage:1,observedHours:168,validSnapshots:2016,snapshots:2016,pendingRollupDays:0,gapsOver10Minutes:[],latest:{capturedAt:'2026-09-23T17:00:09Z'},storage:{pressure:'ok'},attemptsByOutcome:[{outcome:'valid',count:2016}]};
+const restore={checkedAt:'2026-09-23T17:05:00Z',realCaptureRestore:{validSnapshots:2016,snapshotsRestored:2016}};
+test('trial does not pass on elapsed time without recorded completion',()=>{assert.equal(assessTrial(health,{...state,completedAt:null},{now}).status,'awaiting-trial-end');assert.equal(assessTrial(health,state,{now:now-86400000}).accepted,false);});
+test('trial requires real full-span captures and fresh matching restore',()=>{assert.equal(assessTrial(health,state,{now,restore}).accepted,true);assert.equal(assessTrial({...health,observedHours:165},state,{now,restore}).accepted,false);assert.equal(assessTrial(health,state,{now}).accepted,false);assert.equal(assessTrial({...health,gapsOver10Minutes:[{minutes:20}]},state,{now,restore}).accepted,false);});

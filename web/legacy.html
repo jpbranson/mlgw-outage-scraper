@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><title>MLGW legacy outage archive</title>
+  <link rel="stylesheet" href="/legacy.css"><script type="module" src="/legacy.js"></script>
+</head>
+<body><main>
+  <header class="page-header"><div><h1>MLGW outages</h1><p>Memphis &amp; Shelby County</p></div><p>Historical archive · 2022–2025</p></header>
+  <nav class="source-navigation" aria-label="Outage source"><a href="/">Current feed</a><a href="/legacy.html" aria-current="page">Legacy archive · 2022–2025</a><a href="/legacy.html?view=comparisons">Weather comparisons</a></nav>
+  <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">Retry</button></div>
+  <section class="legacy-summary" aria-label="Legacy source and coverage">
+    <p>Old MLGW map · Regional totals and geographic grid areas. Separate from the current feed.</p>
+    <p id="archive-summary" class="muted" role="status">Loading verified history…</p>
+    <p id="exception-summary" class="muted"></p>
+  </section>
+  <div class="map-toolbar"><label>Archive month (UTC) <select id="legacy-month" disabled></select></label><label>Chart <select id="legacy-resolution"><option value="daily">Daily peaks</option><option value="observations">Selected day observations</option></select></label></div>
+  <section class="selection-bar" aria-label="Selected legacy observation"><div><span class="selection-mode">Legacy capture</span><h2 id="selected-time">Select an observation</h2></div></section>
+  <section class="totals" aria-label="Legacy regional totals"><p class="customer-total"><strong id="customers">—</strong> customers affected</p><p><strong id="outages">—</strong> reported outages</p></section>
+  <div class="visual-grid">
+    <section class="panel map-panel" aria-labelledby="map-heading">
+      <div class="panel-heading"><h2 id="map-heading">Reported grid areas</h2><button id="fit-map" class="button-quiet">Reset map</button></div>
+      <div class="map-wrap"><div id="map" aria-label="Legacy geographic grid polygons"></div><div id="map-notice" class="map-notice" role="status">Select a capture to inspect its grid coverage.</div></div>
+      <p id="grid-summary" class="muted map-key">Missing geometry is unknown.</p>
+      <div class="history-controls">
+        <div class="history-heading"><label for="archive-date">Replay date (UTC)</label><input type="date" id="archive-date" disabled></div>
+        <label for="legacy-capture" class="muted">Observation (Central time)</label><select id="legacy-capture" class="legacy-replay-select" disabled><option>No observations loaded</option></select>
+        <div class="slider-row"><button id="previous" aria-label="Previous legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Legacy capture" disabled><button id="next" aria-label="Next legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+        <p id="day-coverage" class="muted" role="status"></p>
+      </div>
+    </section>
+    <section class="panel chart-panel" aria-labelledby="chart-heading">
+      <div class="panel-heading"><h2 id="chart-heading">Observed daily peaks</h2><span id="chart-zone" class="muted">UTC days</span></div>
+      <div class="chart-controls"><div class="segmented" aria-label="Legacy chart measure"><button data-metric="customers" aria-pressed="true">Customers</button><button data-metric="outages" aria-pressed="false">Outages</button></div></div>
+      <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Legacy history. Select a point for its capture; date and observation controls are the keyboard alternative."></canvas><p id="chart-empty" hidden>No numeric observations in this period</p></div>
+      <div class="coverage-label"><span id="coverage">Loading…</span></div>
+      <p class="muted">Gaps are unknown. Empty event tables are not zero outages.</p>
+      <div class="chart-footer"><a id="csv" class="export-link" aria-disabled="true">Download CSV</a><a id="geojson" class="export-link" aria-disabled="true">Grid GeoJSON</a></div>
+      <div class="legacy-coverage"><p id="series-note" class="muted"></p><p id="gap-summary" class="muted"></p></div>
+    </section>
+  </div>
+  <section class="capture-details"><details class="panel data-notes"><summary>Data notes and exclusions</summary><div class="notes-content">
+    <p id="capture-note">Select a capture for its time recovery and original availability.</p><p id="provenance-note"></p>
+    <p>Grid IDs identify geographic areas, not individual outages. Polygon customer counts are not assigned to precise locations or modern Census areas. Regional totals and mapped grid sums can differ.</p>
+    <p id="coverage-note"></p><p id="largest-gap"></p><ul id="legacy-exceptions" class="legacy-exceptions"></ul>
+    <p id="source-range"></p><p>Capture timestamps identify saved observations; they do not establish source publication time. The old archive does not train the current-feed anomaly baseline. Prepared weather comparisons use regional totals and display their own joint coverage and limits.</p>
+  </div></details></section>
+  <footer><span>Independent local archive · legacy_html</span><a href="https://outagemap.mlgw.org/OutageSummary.php" target="_blank" rel="noopener noreferrer">Official MLGW outage map</a></footer>
+</main></body></html>

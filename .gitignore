@@ -8,3 +8,5 @@ data/
 reports/*.json
 reports/*.log
 reports/*.png
+__pycache__/
+*.pyc

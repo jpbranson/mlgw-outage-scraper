@@ -54,6 +54,23 @@ test('valid password establishes a secure session and forwards only permitted re
   assert.equal((await fetch(base+'/data/weather/cache/published/catalog.json',{headers:{Cookie:cookie}})).status,404);
   assert.equal(calls.length,5);
 });
+test('copied passwords tolerate surrounding padding but retain exact case and internal characters', async t => {
+  const { base, login } = await setup(t);
+  const page = await (await fetch(base)).text();
+  assert.match(page, /autocapitalize="none"/);
+  assert.match(page, /autocorrect="off"/);
+  assert.match(page, /spellcheck="false"/);
+  for (const value of [' ' + password + ' ', '\t\r\n' + password + '\r\n', '\u00a0\u200b' + password + '\u200b\ufeff']) {
+    const response = await login(value);
+    assert.equal(response.status, 303);
+    assert.match(response.headers.get('set-cookie'), /Secure; HttpOnly; SameSite=Lax/);
+  }
+  for (const value of [password.toUpperCase(), password.slice(0, 8) + ' ' + password.slice(8), password + 'x']) {
+    const response = await login(value);
+    assert.equal(response.status, 401);
+    assert.equal(response.headers.get('set-cookie'), null);
+  }
+});
 test('wrong passwords, forged cookies and cross-origin requests cannot reach data', async t => {
   const { base, login, calls } = await setup(t);
   assert.equal((await login('wrong')).status, 401);
@@ -63,6 +80,21 @@ test('wrong passwords, forged cookies and cross-origin requests cannot reach dat
   const cookie = (await login()).headers.get('set-cookie').split(';')[0];
   assert.equal((await fetch(base + '/api/latest', { headers: { Cookie: cookie, Origin: 'https://foreign.example' } })).status, 403);
   assert.equal(calls.length, 0);
+});
+test('legacy pages require login and only the bounded legacy read routes are forwarded', async t => {
+  const { base, login, calls } = await setup(t);
+  const page = await fetch(base + '/legacy.html'); assert.equal(page.status, 200); assert.match(await page.text(), /Preview password/);
+  const paths = ['/legacy.js', '/legacy.css', '/api/legacy/catalog', '/api/legacy/series?from=2022-12-01T00:00:00Z&to=2023-01-01T00:00:00Z',
+    '/api/legacy/snapshots?date=2022-12-23', '/api/legacy/snapshot/legacy-' + 'a'.repeat(24), '/api/legacy/export.csv', '/api/legacy/export.geojson?id=legacy-' + 'a'.repeat(24)];
+  for (const path of paths) assert.equal((await fetch(base + path)).status, 401, path);
+  assert.equal(calls.length, 0);
+  const cookie = (await login()).headers.get('set-cookie').split(';')[0], headers = { Cookie: cookie };
+  for (const path of ['/legacy.html', ...paths]) assert.equal((await fetch(base + path, { headers })).status, 200, path);
+  const allowedCalls = calls.length;
+  for (const path of ['/data/legacy/dashboard/catalog.json', '/api/legacy/prepare', '/api/legacy/admin', '/api/legacy/snapshot/current-id', '/api/legacy/catalog/extra'])
+    assert.equal((await fetch(base + path, { headers })).status, 404, path);
+  assert.equal((await fetch(base + '/api/legacy/catalog', { headers, method: 'POST' })).status, 405);
+  assert.equal(calls.length, allowedCalls);
 });
 test('expiry revokes existing sessions and the login endpoint', async t => {
   const start = Date.now(); let now = start;

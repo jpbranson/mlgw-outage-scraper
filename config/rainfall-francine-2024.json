@@ -1,0 +1,9 @@
+{
+  "name": "Francine September 12–14, 2024 prolonged-rain validation",
+  "reportId": "rainfall-francine-2024",
+  "from": "2024-09-12T00:00:00Z",
+  "to": "2024-09-15T00:00:00Z",
+  "hoursPerBatch": 24,
+  "contextUrl": "https://www.weather.gov/meg/hurricanefrancinerainwindevent",
+  "purpose": "Weather-only prolonged-rain validation. The NWS event report identifies the case; its station totals use different intervals and are not exact grid validation targets. No historical outage records are inferred or imported."
+}

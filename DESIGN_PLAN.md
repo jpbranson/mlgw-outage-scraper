@@ -1,18 +1,22 @@
 # MLGW outage history and dashboard: design plan
 
-Prepared September 16, 2026; reconciled with the implementation and deployment state on September 17, 2026. See [current status and the documentation index](reports/PROJECT_STATUS.md) for dated runtime checks, completed work and remaining steps. Editing this plan does not start collection, deploy resources, install tasks, or authorize an additional implementation stage.
+Prepared September 16, 2026; deployment selection and current operating state updated September 22, 2026. See [current status and the documentation index](reports/PROJECT_STATUS.md). Editing this plan does not itself authorize additional implementation work.
 
-**Current scope as of September 17:** collection, validation and the dashboard run locally. The user explicitly requested a replacement Cloudflare Quick Tunnel, which was deployed behind the existing password gateway and verified; its eight-hour session expires September 17 at 1:57:53 PM CDT. This does not change the planned production audience or authorize permanent cloud deployment. Local Phases 1–2 trials are underway and the Phase 3 dashboard, historical heatmap and Census per-capita maps are implemented. Phase 3A source/cache, single-capture weather, numeric accumulation/spatial weighting and prepared 24/48/72-hour rainfall controls are implemented. Broader weather validation and weather/outage comparisons remain planned. Cloud compute/storage validation and desktop transfer/cleanup remain deferred until requested. Use `npm run preview:status` rather than this dated paragraph to determine whether a preview is still running.
+**September 22 deployment:** the user selected a DigitalOcean Linux VM and public-IP access, and authorized deployment. The $12/month, 1 CPU / 2 GB / 50 GB Ubuntu VM now hosts the existing filesystem/SQLite application at https://64.225.60.118. Linux services run five-minute outage collection and 30-minute weather refresh continuously. All retained history was verified during migration, and local collectors are stopped. HTTPS and certificate renewal are configured. The [deployment guide](reports/DIGITALOCEAN_DEPLOYMENT.md) supersedes earlier local-only and free-first implementation assumptions below; long-term retention and evidence protections remain in force.
 
-**Access update:** the user subsequently requested tunnel closure. The September 17 supervisor and tunnel processes were verified stopped at 7:29:59 AM CDT / 12:29:59 UTC with reason `owner_requested`, before their scheduled expiry. The local dashboard remained healthy; no replacement session was started.
+**Historical scope, September 18:** collection, validation and the dashboard run locally. The 24-hour pilot passed; the seven-day collector trial continues. The dashboard, heatmap, Census per-capita maps, weather replay, legacy integration and two rainfall/wind cases with matched references are complete. The requested [autonomous continuation](reports/DEVELOPMENT_COMPLETION_STATUS.md) adds verified cold/heat comparisons, original legacy-grid cold summaries, isolated ongoing weather refresh/retention, a real-data desktop-transfer rehearsal and a guarded seven-day acceptance command. Three additional rainfall/wind candidates failed the existing reference screen; snow/ice and some heat periods lack sufficient outage coverage. Saved study evidence remains protected under a shared 1 GiB weather cap. The existing Quick Tunnel keeps its September 18 3:06 PM CDT expiry. Cloud provider validation/deployment and Phase 4B installation/cleanup still need account/runtime setup; unsupported source families, missing legacy evidence and richer local-exposure rankings remain open.
+
+**Access update, September 18:** after the September 17 session was closed at the user's request, the user requested a new Quick Tunnel deployment of the latest version. The new password-protected session began at 7:06:19 AM CDT and expires at 3:06:19 PM CDT. Current-feed, weather and legacy routes passed external verification and browser sign-in/replay. Storage and collection remain local.
+
+**Source review update, September 17 at approximately 12:20 PM CDT:** the 24-hour pilot completed with 290/290 observed slots and passed its local observation gate. All captures mirrored into the existing seven-day collector, which continued directly at the next slot. All 297 captures at the 17:15 UTC cutoff replayed and restored successfully; dashboard API totals/freshness matched. The [completed review](reports/PHASE1_STATUS.md) documents source start/location edits and an HTML-inclusive storage model. Full seven-day acceptance and provider validation remain pending; earlier statements that both pilots were running describe the morning checkpoint.
 
 ## 1. Recommended approach
 
-The original production candidate is a small TypeScript application on Cloudflare: scheduled compute collects MLGW's public GeoJSON feed, R2 stores historical snapshots, D1 stores compact time-series summaries, and a static dashboard displays a map and charts. The local implementation uses Node, filesystem archives and SQLite. Phase 1 measurements favor testing a Durable Object for ingestion compute and compressed originals with a bounded normalized cache; the ordinary Worker-only design has not passed its resource gate. Keep the parser and analytics portable.
+The selected production implementation uses Node 24, immutable compressed filesystem archives, SQLite and a static dashboard on a DigitalOcean Linux VM. Caddy terminates HTTPS and proxies the loopback dashboard; systemd manages the collectors. The original Cloudflare proposal and its unrun benchmark remain historical alternatives. Keep the parser and analytics portable.
 
 Start with **five-minute collection**, with a configurable one-minute option after measuring the source's actual update frequency. Keep detailed observations indefinitely where practical. Retain them in the cloud while space permits; under storage pressure, transfer detail older than one year to this Windows PC, verify it, and then remove only those verified cloud copies. Keep the newest year in cloud storage and long-term summaries available to the dashboard.
 
-The dashboard will be **accessible to anyone with its link**, with light expected use. **Prioritize $0 recurring cost.** Cloudflare remains the first implementation candidate, subject to storm-load and compression tests. If free Workers compute is insufficient, evaluate free-tier compute alternatives before considering a paid plan; no paid upgrade is assumed.
+The dashboard is **accessible to anyone with its link**, with light expected use. The user selected the **$12/month DigitalOcean VM** after considering cloud options. Additional paid backup or storage products are not enabled automatically.
 
 The useful first version answers:
 
@@ -29,16 +33,16 @@ The weather extension will also answer:
 
 ### Confirmed requirements and remaining setup choices
 
-The audience, retention intent, cost priority, and 30-day offline-PC allowance below reflect the user's September 16 clarifications. Local implementation status is recorded separately from future production requirements; cloud deployment and Windows-task installation remain deferred implementation steps.
+The audience, retention intent and 30-day offline-PC allowance retain the user's September 16 requirements. The September 22 choice of a $12/month DigitalOcean VM supersedes the original free-first hosting preference. Cloud deployment is complete; recurring desktop backup scheduling and long-term offload installation remain separate work.
 
 | Decision | Requirement or selected approach | Implementation implication |
 | --- | --- | --- |
 | Audience | Anyone with the link; mostly personal use | No viewer login. Cache public reads, bound traffic, and keep administrative/archive operations authenticated. An unlisted URL does not enforce privacy. |
 | History | Preserve detail as long as possible; newest year always in the cloud | Move older detail to the PC only when storage pressure warrants it; verify local receipt before cloud deletion. |
-| Cloud provider | No preference; prioritize free | Start by validating Cloudflare; select another free-tier compute option if necessary. |
-| Budget | Free-first; no paid compute commitment | Measure compressed annual storage and storm processing before launch; do not enable paid upgrades automatically. |
-| Scope | All reported MLGW electric outages; anomalies, historical heatmap, Census per-capita maps and prepared weather/rainfall views | Extend the implemented local weather replay with broader validation in Phase 3A and condition comparisons in Phase 5. Automated notifications remain optional. |
-| Validation and access now | Local validation; separately requested password-protected Cloudflare Quick Tunnel deployed September 17 | Weather work can run locally. Keep the requested session's expiry. Further sessions require a request; permanent cloud hosting/collection and persistent public access remain deferred. |
+| Cloud provider | DigitalOcean Linux VM, selected September 22 | Existing filesystem/SQLite implementation is deployed; use the public IPv4 address first. |
+| Budget | Selected $12/month VM | No additional paid backup/storage products enabled; monitor growth and retain storage stop guards. |
+| Scope | All reported MLGW electric outages; anomalies, historical heatmap, Census per-capita maps and prepared weather/rainfall views | Verified legacy history has separate dashboard views. Four rainfall/wind/cold/heat cases, matched references, native-grid cold summaries and bounded rolling weather refresh/retention are implemented. Additional supported source families, independent episodes and richer exposure analysis remain open. Automated notifications remain optional. |
+| Validation and access now | Public HTTPS at https://64.225.60.118 | Linux tests, real archive restore, external route checks and certificate renewal rehearsal passed; earlier Quick Tunnel sessions are historical. |
 | Weather scope | Radar, rainfall accumulation and historical conditions including flash flood, prolonged rain, snow, ice and heat | Include wind alongside rain; distinguish measurements, warnings, reported events and derived condition labels. Start with radar/rainfall, then comparative analysis. |
 | Desktop setup | PC is on irregularly; reserve at least 30 days of offline headroom | Size the reserve from projected storage growth, including storm periods. The provisional archive folder is `C:\Developer\mlgw-outage-scraper\archive`; recheck capacity for Phase 4B. |
 
@@ -93,24 +97,30 @@ The [`total_parsed_polygons.rds`](https://github.com/jpbranson/mlgw.outage.3/blo
 
 Import this history with `source_format=legacy_html` and preserve its geographic grid polygons. Use `source_format=current_geojson` for new point features. Legacy cell IDs are geographic-area IDs, not current outage IDs; do not turn grid centroids into precise outage locations or distribute grid customer totals among individual events. Show a source-format boundary on charts and do not use old-map observations to train the new-feed anomaly baseline without a comparability check.
 
+The owner's three-repository [September 17 overlap audit](reports/LEGACY_HISTORY_AUDIT.md) confirms that all consolidated total observations and valid spatial records from `mlgw.outage` and `mlgw.outage.2` are contained in `mlgw.outage.3` at the pinned branch tips. Separate compressed staging retains all provenance for the 53,274 total observations and 18,906 grid captures, with no matching-identity conflicts. Subsequent [timezone recovery](reports/LEGACY_TIMEZONE_RECOVERY.md) resolves 53,273 totals and all grid snapshots, leaving one total explicitly unresolved. The [coverage audit](reports/LEGACY_COVERAGE_AUDIT.md) inventories 53,679 captures across selected revisions, classifies empty/failed captures and retains one extra nonempty original for reconciliation. These completed audits preserve original staging. The [separate dashboard publication](reports/LEGACY_DASHBOARD_STATUS.md) is complete for verified totals and grid snapshots; an exhaustive raw-page/Git-history import is outside that completed scope.
+
 ### Historical weather sources: documented candidates
 
-Source documentation was reviewed September 16, 2026. The September 16–17 [weather checkpoints](reports/PHASE3A_STATUS.md) subsequently verified bounded radar, numeric rainfall, station and warning samples, followed by dashboard controls, airport observations and 24/48/72-hour rainfall validation/display. Full Phase 3A acceptance, including broader period, event and quality checks, remains pending.
+Source documentation was reviewed September 16, 2026. The September 16–17 [weather checkpoints](reports/PHASE3A_STATUS.md) subsequently verified bounded radar, numeric rainfall, station and warning samples, followed by dashboard controls, airport observations, 24/48/72-hour rainfall validation/display, source-specific station quality interpretation and finalized event/county-zone warning checks. The supported sample checkpoints and separate legacy import are complete. September 18 adds four verified case/reference comparisons and bounded rolling refresh/retention; additional station source families remain excluded until validated. Further historical comparisons must meet the same explicit coverage and alignment checks.
 
 | Source | Planned use | Resolution, history and limits |
 | --- | --- | --- |
 | [Iowa Environmental Mesonet NEXRAD mosaics](https://mesonet.agron.iastate.edu/docs/nexrad_mosaic/) and [timestamped map services](https://mesonet.agron.iastate.edu/ogc/) | Historical radar reflectivity overlay synchronized with outage replay | Five-minute mosaics; the higher-detail N0Q archive is documented from November 2010. Reflectivity is a signal in dBZ, not rainfall depth or confirmed surface precipitation. Check actual frame availability; transparent pixels alone cannot prove dry conditions. |
 | [NOAA MRMS precipitation products](https://mapservices.weather.noaa.gov/raster/rest/services/obs/mrms_qpe/ImageServer), [IEM archived layers](https://mesonet.agron.iastate.edu/ogc/) and [NOAA open-data archive](https://registry.opendata.aws/noaa-mrms-pds/) | Rainfall-rate/accumulation display and quantitative spatial rainfall summaries | Approximately 1 km products. IEM documents archived 1/24/48/72-hour accumulation layers at hourly endpoints since early 2015. NOAA's open archive starts in October 2020. Use numeric grids for analysis, not colors sampled from display tiles. Product variants, gauge adjustment, version changes, coverage and units must remain explicit. |
-| [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly), replacing Global Hourly / ISD | Historical temperature, dew point/humidity, wind/gusts, precipitation and available present-weather/snow observations | Validated station/year PSV samples preserve quality fields; the tested JSON subset path omitted essential metadata. The current Memphis file ends August 26, 2026, leaving the September 16 station sample unavailable. Station readings remain regional, with source-specific quality, reporting interval and location. |
+| [NOAA GHCNh](https://www.ncei.noaa.gov/products/global-historical-climatology-network-hourly), replacing Global Hourly / ISD | Historical temperature, dew point/humidity, wind/gusts, precipitation and available present-weather/snow observations | Validated station/year PSV samples preserve quality fields; the tested JSON subset path omitted essential metadata. The refreshed Memphis snapshot ends September 9, 2026 at 16:54 UTC; the prior August 26 snapshot is retained and the September 16 sample remains unavailable. Station readings remain regional, with source-specific quality, reporting interval and location. |
 | [NOAA Storm Events](https://www.ncei.noaa.gov/access/storm-events-database/assets/pdf/Storm_Events_Database_User_Guide.pdf), with [IEM NWS warning archives](https://mesonet.agron.iastate.edu/ogc/) where supported | Context for flash floods, thunderstorm winds, snow/ice, heat and other documented episodes | Event records can be county/forecast-zone based and are published with a delay. Warning polygons describe warned areas, not confirmed damage footprints. Missing reports do not establish that a hazard was absent. Audit archive completeness and geometry before spatial use. |
+
+The later [event-context checkpoint](reports/EVENT_CONTEXT_STATUS.md) validates six selected cases using pinned 2022/2023/2024/2026 NOAA detail files and IEM county/zone warning snapshots. Thirteen selected event records and eight administrative alerts independently verify. The current NOAA release only has events beginning through May 2026, so September stays outside observed coverage. Warning boundary vintage is not independently certified, and archived later updates prevent treating these records as exact issuance-time replays.
 
 IEM's [MRMS archive notice](https://mesonet.agron.iastate.edu/archive/mrms.php) now describes a rolling 30-day cache for hourly raw ZIP files. Do not treat that convenience cache as permanent storage; use the documented long-term archives and preserve the inputs needed for each saved analysis. NOAA's MRMS open-data archive does not require an AWS account. Access methods and caching conditions must be checked during implementation; public data availability is not an uptime guarantee.
 
-The current-feed outage archive starts September 16, 2026, but the already identified legacy observations can support older weather comparisons after import. Spatial comparisons are limited by the separate legacy geometry coverage and gaps described above. Total-only observations support regional time-series comparisons, not invented neighborhood maps.
+The current-feed outage archive starts September 16, 2026, but the already identified legacy observations can support older weather comparisons in the separate legacy archive. Spatial comparisons are limited by the separate legacy geometry coverage and gaps described above. Total-only observations support regional time-series comparisons, not invented neighborhood maps.
+
+**Legacy timezone recovery update:** the separate [verified recovery catalog](reports/LEGACY_TIMEZONE_RECOVERY.md) resolves 53,273 historical total observations and all 18,906 grid snapshots. One total's timezone remains unresolved. Full original-epoch checks, source-version/commit rules and independent R verification replace the earlier blanket unresolved-time status for supported records. The subsequent [capture-coverage checkpoint](reports/LEGACY_COVERAGE_AUDIT.md) inventories 53,679 captures, classifies empty/failed records and preserves one extra nonempty original for reconciliation. The [legacy dashboard](reports/LEGACY_DASHBOARD_STATUS.md) now exposes those gaps and exclusions in a separate archive view. Original staging is preserved.
 
 ## 3. Collection frequency and reliability
 
-Five minutes is a good starting compromise: better than the requested 15-minute resolution, inexpensive, and only 288 feed requests per day. A short source-characterization pilot should measure byte changes, meaningful feature changes, response times, and apparent update intervals over at least 24 hours.
+Five minutes remains the provisional cadence: finer than the requested 15-minute resolution and 288 feed requests per day, plus the separately retrieved HTML checks. The [completed 24-hour pilot](reports/PHASE1_STATUS.md) measured byte/meaningful changes and response spacing; it supports this cadence without proving the source publication interval or storm completeness. The local trial and continuing cloud observations supply longer operating evidence; the stopped local trial has not been accepted as a completed seven-day run.
 
 | Poll interval | Polls/day | Polls/30-day month | Polls/365-day year |
 | --- | ---: | ---: | ---: |
@@ -118,109 +128,98 @@ Five minutes is a good starting compromise: better than the requested 15-minute 
 | 5 minutes | 288 | 8,640 | 105,120 |
 | 1 minute | 1,440 | 43,200 | 525,600 |
 
-Use Cloudflare Cron Triggers, initially `*/5 * * * *`, in UTC. One-minute triggers are supported. The browser does not drive collection. [Cron documentation](https://developers.cloudflare.com/workers/configuration/cron-triggers/)
+The deployed `mlgw-collector` systemd service runs `scripts/production-collector.mjs`, checks every 30 seconds and captures the next due UTC five-minute slot. Persistent next-due/backoff state and the SQLite lease prevent duplicate publication. The browser does not drive collection. The production configuration currently requires five-minute polling; a one-minute mode would need implementation and validation.
 
-If source changes occur more frequently than five minutes, consider fixed one-minute polling after checking resource use and source guidance. An optional later mode can poll every minute during elevated activity and every five minutes otherwise; a one-minute trigger with a durable next-due value implements that without repeatedly changing cron configuration.
+If source changes occur more frequently than five minutes, consider fixed one-minute polling after checking resource use and source guidance. An optional later mode can poll every minute during elevated activity and every five minutes otherwise; a future durable next-due policy could select the interval without changing the service schedule.
 
 Polling resolution and information freshness are different. A five-minute collector can repeatedly receive the same source state; faster polling cannot expose changes that MLGW has not published. Outages that begin and end between observations may never be captured.
 
-### Target cloud collection attempt
+### Deployed cloud collection attempt
 
-These steps describe the production candidate. The implemented local counterpart uses filesystem archives and SQLite, as documented in [Phase 2](reports/PHASE2_STATUS.md).
+These steps describe the deployed filesystem/SQLite collector. The [deployment guide](reports/DIGITALOCEAN_DEPLOYMENT.md) records Linux execution, real archive recovery and the service lifecycle; [Phase 2](reports/PHASE2_STATUS.md) preserves the original local implementation evidence.
 
 1. Assign an attempt ID and a UTC scheduled-slot ID. Record actual request and response times separately.
 2. Fetch the allowlisted GeoJSON URL with a 15-second timeout and a configurable response-size ceiling. Use conditional headers if the source later supplies validators.
-3. Preserve the received body and selected response metadata before parsing/normalization. The revised candidate retains a byte-exact gzip original and its uncompressed-body hash; any uncompressed staging is bounded and removed only after verified archival/indexing. Local compression/replay is measured; its cloud compute cost still requires provider testing.
+3. Preserve the received body and selected response metadata before parsing/normalization. Production retains a byte-exact gzip original and its uncompressed-body hash; redundant staging is removed only after verified archival/indexing. Compression, replay and restore were exercised in Linux and on the VM.
 4. Validate the collection, required identifiers, nonnegative integer customer counts, timestamp parsing, and geometry. Preserve unknown fields in the private raw archive. Flag out-of-area coordinates for review rather than silently losing those outages.
 5. Produce a normalized snapshot, totals, and comparisons with the previous valid observation. Store timestamps, validation results, and parser version.
-6. Write immutable R2 objects first. Commit the D1 snapshot reference and summaries together only after those objects exist. Advance the latest pointer only if this capture is newer than the current one.
+6. Write immutable archive objects and manifests first. Commit the SQLite snapshot reference and summaries together only after those objects exist. Advance the latest pointer only if this capture is newer than the current one.
 7. Update the cached dashboard result. Record failures without converting them into zero outages.
 
-Use a short expiring lease to prevent overlapping collectors. Make slot publication idempotent, keep retry attempts as separate records, and tolerate orphaned R2 objects after a failed database commit. Retrying publication must not double-count a snapshot. A recovery pass can find archived but unprocessed captures and process them later with their original observation times.
+Use a short expiring lease to prevent overlapping collectors. Make slot publication idempotent, keep retry attempts as separate records, and tolerate archived objects awaiting indexing after a failed database commit. Retrying publication must not double-count a snapshot. A recovery pass can find archived but unprocessed captures and process them later with their original observation times.
 
 Retry transient network/5xx failures at most twice with jitter inside a bounded run. Honor `Retry-After` for 429 responses, even if that means skipping scheduled slots. A delayed run captures the current state at its actual retrieval time; it must never pretend to backfill the earlier scheduled instant.
 
 Track two independent health measures: **last successful retrieval** and **evidence of source freshness**. Identical content alone is not evidence of failure. With no reliable source timestamp, show “retrieved at” and “source update time unavailable.” Flag collection gaps above 10 minutes and display a clear stale-data banner at 15 minutes. Use an independent heartbeat check so a stopped scheduler can be detected.
 
-## 4. Proposed cloud architecture (not deployed)
+## 4. Deployed cloud architecture
 
-This is a future production design, separate from the running Node/filesystem/SQLite implementation and its temporary Quick Tunnel. The revised candidate uses a scheduling Worker and Durable Object for ingestion, compressed canonical originals and a bounded normalized cache. Provider resource gates remain open.
+One DigitalOcean Ubuntu VM runs the existing Node/filesystem/SQLite application. Separate systemd services isolate the outage collector, rolling weather refresh and read-only dashboard. Caddy terminates HTTPS at the selected public IP and proxies the dashboard on loopback. A health timer checks freshness, runner heartbeats and free disk space; a separate timer renews the IP certificate.
 
 ```mermaid
 flowchart LR
-    M[MLGW public GeoJSON] --> C[Ingestion Durable Object]
-    T[Cloudflare Cron: every 5 minutes] --> S[Scheduling Worker]
-    S --> C
-    C --> R[R2: compressed originals, manifests, parsers and bounded derived cache]
-    C --> D[D1: capture index and time-series totals]
-    R --> B[Bounded rollup job]
-    D --> B
-    B --> R
-    B --> D
-    R --> A[Read-only dashboard API Worker]
+    M[MLGW public feed and HTML] --> C[Five-minute collector service]
+    C --> R[Immutable gzip originals and manifests]
+    C --> D[SQLite index and rollups]
+    W[Weather sources] --> J[Thirty-minute weather service]
+    J --> E[Saved evidence and bounded rolling cache]
+    R --> A[Read-only Node dashboard on loopback]
     D --> A
-    A --> U[Static dashboard: map and charts]
-    H[Independent heartbeat check] --> A
-    R --> E[Authenticated archive transfer endpoint]
-    E --> P[Windows scheduled archive downloader]
-    P --> L[PC archive: verified files and manifests]
-    P --> V[Verified receipt and cloud cleanup]
-    V --> R
+    E --> A
+    A --> P[Caddy HTTPS at public IP]
+    P --> U[Browser]
+    H[Private health timer] --> A
+    R --> B[On-demand backup over SSH]
+    E --> B
+    B --> L[Verified backup on PC]
 ```
 
-The proposed deployments separate the scheduling Worker/ingestion Durable Object from the dashboard/API Worker, although account-level free quotas remain shared. A small scheduled maintenance job would build rollups incrementally from newly accepted snapshots, with a durable processing cursor. This candidate still requires the runtime and storage tests in Phase 1; no production adapter or deployment is implemented.
+The public dashboard has no viewer login and exposes only allowlisted reads. Canonical raw archives, administrative operations and backup downloads are not public routes; administration uses SSH. Runtime services use the unprivileged `mlgw` account and dedicated writable directories. Credentials and local trial state were excluded from deployment bundles.
 
-Serve the frontend with Workers Static Assets. Static-asset requests are free and unlimited; API requests execute Worker code and consume its allowance. Use the supplied `workers.dev` hostname initially to avoid a domain purchase. [Static asset billing](https://developers.cloudflare.com/workers/static-assets/billing-and-limitations/), [Workers hostnames](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/)
-
-The dashboard and its bounded read-only API are public without login. Keep R2 buckets private and expose only selected normalized data through the API. Archive transfers, receipts, cleanup, and administrative controls require separate machine authentication and must never share the public cache. The collector needs no public HTTP ingestion route. A `noindex` directive can discourage search indexing, but the link remains publicly accessible.
+The production collector has no trial deadline, restarts after failures and resumes its recorded schedule. Source restrictions, operator stop markers and urgent storage stops require review and survive service restarts. The two local PC collectors are stopped, so only the VM polls upstream sources. Recurring off-VM backups, external notifications and automatic deletion of canonical history are not installed.
 
 ### Alternatives considered
 
-| Option | Assessment |
-| --- | --- |
-| Cloudflare Workers + R2 + D1 | Recommended for a small integrated deployment with inexpensive retained history. Free compute is the main constraint. |
-| AWS EventBridge Scheduler + Lambda + object storage | Evaluate before paid Workers if storm parsing/compression exceeds free CPU. Published allowances include 14 million scheduler invocations and 1 million Lambda requests / 400,000 GB-seconds per month. Storage, requests, logs, hosting, egress, and account-plan eligibility still need budgeting; this is not an end-to-end $0 guarantee. Keep the collector/parser portable. Using Lambda with Cloudflare storage is also possible, but adds authenticated transfer and AWS outbound-transfer accounting. |
-| GitHub Actions as the collector | Suitable for tests and deployments, but unsuitable as the primary sampling clock: scheduled jobs can be delayed or dropped and the minimum interval is five minutes. Public-repository schedules can also be disabled after inactivity. |
-
-Sources: [AWS Scheduler pricing](https://aws.amazon.com/eventbridge/pricing/), [Lambda pricing](https://aws.amazon.com/lambda/pricing/), [GitHub schedule behavior](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule).
+The original September 16 proposal used Cloudflare Workers/Durable Objects, R2 and D1. It was not deployed, and its provider-specific compute/storage gates are not claims about this VM. The [prepared Cloudflare probe](README.md#cloud-runtime-probe-deferred-prepared-not-deployed) and dated cost model below remain reference material. AWS serverless compute was also considered; GitHub Actions was rejected as the primary sampling clock. The selected VM preserves the already-validated filesystem/SQLite implementation.
 
 ## 5. Storage and data model
 
-Keep large, repeating spatial records in R2. Avoid writing one D1 row for every active outage on every poll: 1,000 simultaneous outages at five-minute intervals would produce 288,000 feature rows per day before indexes, exceeding D1's free write allowance.
+Canonical source bodies are immutable gzip files; each observation has a manifest and pinned parser. SQLite stores the compact index and rollups rather than one indefinitely retained row per outage feature per poll. The live data root is `/var/lib/mlgw/data`; local development uses the matching `data/` layout.
 
-### Proposed R2 object layout
-
-Illustrative cloud keys below reflect the compressed-original candidate, not the current filesystem paths. The local layout is documented in the [README](README.md#phase-2-local-collector).
+### Current filesystem layout
 
 ```text
-objects/<original-body-sha256>.gz
-metadata/YYYY/MM/DD/<attempt-id>.json
-parsers/<parser-sha256>.mjs
-normalized-cache/YYYY/MM/DD/<snapshot-id>.geojson.gz
-manifests/YYYY/MM/DD.json
-rollups/hourly/YYYY/MM/DD.json
-rollups/daily/YYYY/MM.json
+data/collector/archive/objects/<original-body-sha256>.gz
+data/collector/archive/manifests/<attempt-id>.json
+data/collector/archive/parsers/<parser-version>-<parser-sha256>.mjs
+data/collector/index.sqlite
+data/collector/production-state.json
+data/collector/staging/
+data/weather/cache/
+data/weather/live-cache/
+data/weather/production/state.json
 ```
 
-Raw bodies are immutable. Normalized snapshots contain a stable, explicitly allowed set of fields for the dashboard, plus provenance. Daily manifests connect every accepted timestamp to its snapshot and record failed/missing slots. Byte-identical responses may share an archived payload, but each successful observation still has a timestamped manifest entry. Do not mistake a change in `DURATION` alone for a new outage event.
+Byte-identical responses can share archived bodies, while each attempt retains its own times and provenance. Failed observations are not converted to zero outages. Production removes redundant staging only after verifying its durable copy. It preserves canonical originals; no unconditional one-year expiration or automatic history offload is enabled.
 
-### D1 tables
+### SQLite tables
 
-| Table | Essential columns and purpose |
+| Table | Stored purpose |
 | --- | --- |
-| `poll_attempts` | Attempt ID, scheduled slot, actual capture time, HTTP status, bytes, latency, archive key, parse outcome, error category |
-| `snapshots` | Snapshot ID, unique accepted slot, capture time, optional source update time, raw/normalized object keys, hash, valid/invalid feature counts, quality flags, parser version |
-| `totals` | Snapshot ID, outage-feature count, affected customers, new/disappeared reported events, coverage/comparability flags |
-| `rollups` | Bucket start, resolution, customer-minute estimate, covered minutes, mean/peak customers, peak outage count, anomaly summaries |
-| `collector_state` | Lease, latest committed snapshot, next-due time if needed, maintenance cursor |
+| `poll_attempts` | Attempt ID, scheduled/received times, HTTP status, outcome/error, archive keys and hashes |
+| `snapshots` | Unique accepted slot, capture time, raw key/hash, parser identity, quality and recent event-key cache |
+| `totals` | Snapshot ID, affected customers and reported outages |
+| `rollups` | Resolution/bucket, customer-minutes, covered minutes, mean/peak customers, peak outages and observation count |
+| `leases` | Collector owner and expiration |
+| `collector_state` / `maintenance_queue` | Internal state and queued rollup days |
 
-Index capture time and bucket time; use primary/unique keys for idempotency. Keep indexes few and queries bounded. Query metadata must include the observation time and coverage, not just numeric totals.
+The exact schema is `src/durable/schema.sql`. Time indexes and unique slot constraints bound reads and prevent duplicate publication. Coverage accompanies rollups. The canonical archive can rebuild SQLite; copying only an open SQLite main file is not a valid live backup.
 
-Initially retain D1 capture indexes and full-resolution totals for one year, attempts for 30 days, and compact hourly/daily totals longer. At one-minute collection or approaching 350 MB, archive older capture indexes/totals into R2 manifests and shorten D1's hot window to 90 days. Historical maps remain accessible through date manifests. Store spatial rollups as R2 files rather than an indefinitely growing cell-by-time D1 table.
-
-Keep canonical originals, provenance and retained parsers in the cloud beyond one year while capacity permits. The revised candidate retains normalized maps as a 48-hour derived cache and reconstructs older detail from verified originals. Do not apply an unconditional one-year expiration to canonical history. Under storage pressure, use the verified desktop handoff below; preserve complete detail somewhere even when it leaves the cloud. D1's free recovery window is seven days, so it is not a substitute for durable archives. [D1 limits](https://developers.cloudflare.com/d1/platform/limits/)
+Production has a 20 GB collector budget, a 5 GB free-disk reserve and warning/offload/urgent fractions of 70%/80%/90%. These are pressure thresholds, not installed automatic offload jobs. Preserve the newest year and older evidence while capacity permits; review growth before those thresholds are reached.
 
 ### Automatic archiving to this PC
+
+**Earlier implementation boundary, September 18:** the [local transfer core](reports/DEVELOPMENT_COMPLETION_STATUS.md#desktop-transfer-core-and-rehearsal) now supplies bounded bundles, resumable downloads, a SQLite verification catalog, authenticated receipts, restore and a non-executable cleanup-eligibility calculation. An actual 89-capture partition passed download/restore/replay. The cloud receipt receiver, transactional cleanup journal and recurring installation described below remain unimplemented. Since September 22, a separate SSH backup command downloads full verified bundles to the PC using an ACL-protected local key. Its first cloud backup passed an offline restore. This does not implement the future offload/receipt/deletion protocol; no canonical source cleanup is enabled.
 
 Implement the requested cloud-to-desktop transfer as a **desktop-initiated download**. A Windows Scheduled Task contacts the cloud over outbound HTTPS, so the PC needs no public address, open inbound port, or always-running web server. Run daily, resume after missed runs when the PC is available, and prevent overlapping executions. Installation and the target folder are later implementation tasks.
 
@@ -228,22 +227,24 @@ The archive preserves original payloads, normalized geometry/properties, UTC obs
 
 Transfer protocol:
 
-1. Predict storage use from measured recent growth and storm scenarios. Trigger preparation at 70% of the available R2 free storage budget, begin offloading older-than-one-year detail at 80%, and flag urgent pressure at 90%. Start earlier if needed to retain at least 30 days of projected incoming data plus transfer staging and cleanup-grace capacity. Subtract other account usage; these percentages are targets, not provider-enforced caps.
+1. Predict storage use from measured recent growth and storm scenarios. Trigger preparation at 70% of the configured cloud archive budget, begin offloading older-than-one-year detail at 80%, and flag urgent pressure at 90%. Start earlier if needed to retain at least 30 days of projected incoming data plus transfer staging and cleanup-grace capacity. Include other VM data and temporary backup/transfer packaging in disk forecasts; these percentages are planning thresholds, not provider-enforced caps.
 2. Select oldest eligible UTC date partitions only when every observation in them is strictly older than the current instant minus one calendar year. The plan does not permit moving the protected year out of cloud storage.
 3. The PC checks available disk space, downloads immutable parts into `.partial` files, resumes interrupted transfers, checks byte counts and SHA-256, and verifies that the bundle can be read. Write the completed manifest/catalog atomically only after every part is verified.
 4. The PC sends an authenticated receipt identifying the manifest version, object list, hashes, and completed local verification. A narrowly scoped machine credential lives in Windows-protected credential storage, never in the public dashboard.
 5. The cloud records the receipt. After a seven-day grace period and a second successful local verification, the cleanup job rechecks age eligibility and removes only the receipted cloud detail. Keep manifests and summaries. Deduplicated payloads referenced by the protected year cannot be deleted.
 6. After handoff, the public dashboard identifies that date's detailed map as archived to the owner’s PC. It continues to show cloud summaries. The owner can inspect full detail locally or explicitly restore selected bundles to the cloud for sharing; the public page does not connect to this desktop.
 
-Use idempotent receipts, immutable manifest IDs, and a per-part cleanup journal so retries or partial deletion cannot lose unacknowledged files. Export D1-only observation metadata before its cloud rows are pruned. Do not count an R2 ETag as a universal file checksum. Test a restore from the actual downloaded bundle before first enabling cleanup.
+Use idempotent receipts, immutable manifest IDs, and a per-part cleanup journal so retries or partial deletion cannot lose unacknowledged files. Export SQLite observation metadata before any future cloud rows are pruned. Verify original bytes with SHA-256 independently of transfer protocol metadata. Test a restore from the actual downloaded bundle before first enabling cleanup.
 
 The PC is on irregularly, so **30 days of offline headroom is a confirmed requirement**. If it is off, disconnected, full, or has failed verification, leave the cloud copies intact, retry when it becomes available, and show archive-backlog/last-receipt status. Size the reserve from measured storage growth and storm scenarios, with additional room for transfer staging and the deletion grace period. Forecast pressure early enough to preserve that reserve. A verified single-PC archive remains vulnerable to disk loss; a second local/external-drive copy is advisable where available.
 
-There is a real capacity boundary: offloading data older than a year cannot help if the newest year alone exceeds free storage, or if the PC stays unavailable beyond the reserve. Measure this before launch. Compress/deduplicate first, prefer five-minute over one-minute collection if needed, and evaluate other free capacity before paid service. If the requirements no longer fit, surface the storage/cadence decision rather than silently deleting the protected year, losing old detail, or promising unlimited free retention.
+There is a real capacity boundary: offloading data older than a year cannot help if the newest year alone exceeds provisioned storage, or if the PC stays unavailable beyond the reserve. Measure this before launch. Compress/deduplicate first, prefer five-minute over one-minute collection if needed, and review the provisioned capacity before adding storage or changing the VM plan. If the requirements no longer fit, surface the storage/cadence decision rather than silently deleting the protected year, losing old detail, or promising unlimited retention.
 
 ### Weather storage and jobs — Phase 3A, extended in Phase 5
 
-Keep weather acquisition and processing separate from MLGW polling. Weather failures, rate limits or heavy raster processing must not delay outage capture or alter an accepted snapshot. Start with bounded local jobs and a separate cache/storage budget; cloud weather compute and bandwidth would need their own later capacity assessment.
+Keep weather acquisition and processing separate from MLGW polling. Weather failures, rate limits or heavy raster processing must not delay outage capture or alter an accepted snapshot. Use a separate weather service, memory limit and cache budget. Cloud refresh and memory use were checked during deployment; heavy backfills remain bounded explicit work.
+
+The deployed weather service refreshes recent radar, hourly rainfall and KMEM METAR every 30 minutes continuously, using separate production state. The former PC runner is stopped. Its disposable cache is capped at 256 MiB within the shared 1 GiB weather budget; radar expires after four hours, rainfall/METAR after 24 hours. Saved study evidence never expires through this runner. Shared writer/budget locks preserve aggregate limits; source latency and matching tolerances can still leave weather unavailable. Annual GHCNh revisions and new study acquisition remain explicit bounded jobs. See [operation and stop/resume controls](README.md#automatic-weather-refresh). The VM schedule has no trial deadline; recurring backups and external alert delivery remain unconfigured.
 
 - Maintain a weather manifest with provider, product/version, source URL, observation/valid time or interval, retrieval time, units, CRS/grid or station ID, quality/missing-data flags, checksum and processing version. Record original weather times even when displaying a nearest eligible frame.
 - Cache selected Memphis-area imagery and numeric subsets on demand. Use immutable timestamped cache keys, bounded time windows, request concurrency and retry/backoff. Avoid continuously retaining national radar volumes. Distinguish disposable display-cache entries from evidence required to reproduce a saved comparison.
@@ -254,7 +255,7 @@ Keep weather acquisition and processing separate from MLGW polling. Weather fail
 
 ## 6. Time, outage identity, and spatial meaning
 
-Store observation times as UTC instants; display them in `America/Chicago`. Source date strings lack an explicit offset. Preserve them verbatim and provisionally interpret them in `America/Chicago`, recording that assumption. Use an explicit format/time-zone parser, not JavaScript's implicit date parsing. Ambiguous fall-back DST times should carry an ambiguity flag rather than an invented precise instant.
+Store observation times as UTC instants; display them in `America/Chicago`. The current GeoJSON feed's outage start/repair strings lack explicit offsets; preserve them and record the provisional Central-time interpretation. Legacy capture timestamps follow the separately verified source-version/original-epoch rules, and must not inherit that blanket assumption. Use explicit format/time-zone parsing, retaining unresolved fall-back ambiguity rather than inventing an instant.
 
 Use `(OUTAGE_NO, reported start time)` as a provisional event key. Test its stability across the pilot. If a start time is corrected or an ID disappears and reappears, retain the source observations and mark identity uncertain; do not silently invent a new confirmed event or merge unrelated incidents.
 
@@ -301,7 +302,7 @@ Do not publish SAIDI/SAIFI or unique households affected from this feed. Those r
 Use descriptive, reproducible comparisons before fitting a predictive model. A spatial or temporal association is not a verified outage cause. Rain, wind, vegetation, network layout and other factors may coincide; do not assign causal labels to individual outages from a weather overlay.
 
 - Define an episode and comparison window explicitly. Show outages already present at its start separately from newly reported events. Preserve first-observed versus source-reported start-time uncertainty and the existing provisional identity rules.
-- Compare rain during the episode, preceding 1/24/48/72-hour accumulation, temperature and gust observations, and relevant documented hazards. Use specified lag windows, initially concurrent and preceding 1/6/24 hours where supported; version choices and avoid selecting only the lag that looks strongest afterward.
+- Compare rain during the episode, preceding 1/24/48/72-hour accumulation, temperature and gust observations, and relevant documented hazards where supported. The implemented rainfall/wind cases use the previous completed weather hour plus 0, 1 or 3 additional lag hours on both the case and reference. Concurrent or other lag windows would require a separate versioned extension; avoid selecting only the lag that looks strongest afterward.
 - Measure distinct provisional events, observed peak customers and customer-hours (`customer-minutes / 60`), including area-level burden only where spatial data supports it. Keep the existing gap rules and end integration at the last trustworthy observation. Report joint weather/outage coverage rather than treating unavailable weather or outage data as zero.
 - Support heavy rain, prolonged rainfall, flash-flood episodes, strong wind, snow, ice/freezing rain, heat waves and cold as overlapping condition tags. Preserve whether a label comes from an observation, warning, finalized event record or a documented derived rule. Rainfall alone does not establish a flash flood; below-freezing temperature alone does not establish ice accumulation.
 - Compare areas exposed to similar weather severity/duration and suitable season/time baselines. Show per-episode counts and burden, exposure hours, event counts and population denominators; avoid ranking vulnerability from an unadjusted all-time outage count or applying a single station's gust to every neighborhood as local truth.
@@ -326,13 +327,13 @@ The map library and basemap tiles are separate dependencies. For a small persona
 
 ### Weather replay and comparison controls
 
-Phase 3A has implemented a single-capture weather selector (off, radar reflectivity, preceding one-hour rainfall), opacity control, legend, attribution and exact matched time/interval. The capture slider and drawn arrows synchronize outage/weather replay; a regional KMEM temperature/wind plot uses only eligible prior station reports. Rainfall mode separately displays prepared 24/48/72-hour totals and a chart over that exact interval. Acquisition is manual and bounded; opening a view does not fetch upstream weather. The saved June 2023 sample has no imported outage records, so its outage coverage is explicitly missing. Automatic play/pause and synchronized side-by-side rainfall/outage heatmaps remain planned.
+Phase 3A has implemented a single-capture weather selector (off, radar reflectivity, preceding one-hour rainfall), opacity control, legend, attribution and exact matched time/interval. The capture slider and drawn arrows synchronize outage/weather replay; a regional KMEM temperature/wind plot uses only eligible prior station reports. Rainfall mode separately displays prepared 24/48/72-hour totals and a chart over that exact interval. Saved study acquisition is explicit and bounded; a separate maintenance runner refreshes recent display weather. Opening a view does not fetch upstream weather. The current-feed rainfall chart has no outage captures for June 2023 or September 2024; separate legacy and comparison pages now serve verified regional totals for those dates. Automatic play/pause and synchronized side-by-side rainfall/outage heatmaps remain planned.
 
-Broaden the prepared-period workflow before adding general storm/episode selection and comparison. A single radar frame is compared with its matched outage capture, while period summaries must compare outages and rainfall over compatible stated intervals. An antecedent rainfall layer must be labeled as preceding the episode. Do not overlay one storm's rain on the all-time outage heatmap without changing or clearly separating the outage period. Show missing weather independently and keep outage replay usable when weather fails.
+The broadened prepared-period workflow and regional rainfall/wind case/reference comparisons are implemented for June 2023 and September 2024. December 2022 cold and June 2023 heat add temperature-based comparisons, with original-grid cold summaries. Arbitrary episode selection and additional supported conditions remain planned. A single radar frame is compared with its matched outage capture, while period summaries must compare outages and rainfall over compatible stated intervals. An antecedent rainfall layer must be labeled as preceding the episode. Do not overlay one storm's rain on the all-time outage heatmap without changing or clearly separating the outage period. Show missing weather independently and keep outage replay usable when weather fails.
 
-Phase 5 adds condition/episode filters, aligned weather/outage timelines, and a compact area-by-condition comparison view for frequency and customer-hours, with per-capita and exposure context where valid. Keep attribution, population/weather vintages, uncertainties and methods available in Data notes and exports.
+The Phase 5 interface provides four case choices, aligned weather/outage timelines, condition groups and matched snapshot comparisons at fixed 0/1/3-hour additional lags. The cold map preserves original polygons and missing cells; it is not a neighborhood temperature surface or population rate. The heat case explicitly retains preceding-storm recovery as a confounder. Area-by-condition frequency/customer-hours and per-capita weather comparisons remain future work where coverage and denominators support them. Keep attribution, population/weather vintages, uncertainties and methods available in Data notes and exports.
 
-Implemented local read-only API (also allowlisted behind the preview password gateway):
+Implemented read-only API, served publicly through Caddy in production and through loopback in local development:
 
 ```text
 GET /api/latest
@@ -349,13 +350,27 @@ GET /api/weather?at=<explicit-UTC-timestamp>
 GET /api/weather/periods
 GET /api/weather/period?id=<prepared-period-sha256>
 GET /api/weather/image/<prepared-asset-sha256>
+GET /api/legacy/catalog
+GET /api/legacy/series?from=...&to=...
+GET /api/legacy/snapshots?date=YYYY-MM-DD
+GET /api/legacy/snapshot/<snapshot-id>
+GET /api/legacy/export.csv?from=...&to=...
+GET /api/legacy/export.geojson?id=<snapshot-id>
+GET /api/legacy/catalog?view=comparisons
+GET /api/legacy/series?view=comparison&id=june-2023&lag=0
+GET /api/legacy/export.csv?view=comparison&id=june-2023&lag=0&table=reference
+GET /api/legacy/series?view=comparison&id=cold-2022&lag=0
 ```
 
-The weather routes read a bounded local catalog and hash-verified prepared assets. They cannot launch collection or accept arbitrary upstream URLs. Phase 5 episode/comparison routes remain planned. Preview login is handled separately at `POST /preview/login`; the dashboard itself has no write routes. Preserve current authentication for temporary previews; a future public deployment needs its own quota, attribution and cache review.
+The weather routes read bounded saved and rolling catalogs and hash-verified prepared assets. They cannot launch collection or accept arbitrary upstream URLs. Phase 5 comparisons use the existing `/api/legacy/catalog`, `/api/legacy/series` and `/api/legacy/export.csv` routes with `view=comparison` (or `comparisons`), a prepared case ID (`june-2023`, `september-2024`, `cold-2022`, `heat-2023`) and a supported lag; `table=reference` selects paired CSV rows. The service merges the rainfall/wind catalog with `data/comparisons/conditions/catalog.json`; cold-grid summaries and geometry are included in the case JSON. Preview login is handled separately at `POST /preview/login`; the dashboard itself has no write routes. Preserve current authentication for temporary previews; a future public deployment needs its own quota, attribution and cache review.
 
 The local API limits series to 31 days, with five-minute detail limited to two days; hourly/daily resolutions serve longer ranges. Responses are capped at 12 MiB, with a shared 120 API requests/minute budget. Latest/health reads use no-store, series cache privately for 30 seconds, snapshots for 60 seconds and Census geometry/weather PNGs for one day. The preview gateway overrides all responses to no-store/private. Future public caching needs a separate design. Return source attribution, quality flags, and capture times consistently. Escape source strings in popups. Keep database bindings, storage credentials, and administrative operations out of the browser.
 
 ## 9. Cost and capacity estimates
+
+The selected DigitalOcean VM is $12/month for 1 CPU, 2 GB RAM and 50 GB disk, verified through the account API during deployment. About 44 GiB of disk remained free at the operating check. The collector uses a 20 GB budget and 5 GB free-space floor; weather has a separate shared 1 GiB cap. Paid provider backups and extra storage products are not enabled. See the deployment guide for measured memory use and limits.
+
+### Historical Cloudflare comparison — September 16
 
 Prices below were checked against provider documentation on September 16, 2026. Allowances are shared with other applications in the account and may change.
 
@@ -394,9 +409,9 @@ The outage-only estimates above do **not** include weather imagery, numeric grid
 
 ### Phase 1: establish the source contract
 
-**Current execution scope:** the user directed collection/runtime validation to remain local, then separately requested temporary Cloudflare Quick Tunnel access. Complete the local observation, parsing/replay, stress and storage checks, then report back. Permanent cloud account/deployment and provider-runtime validation remain deferred. A working tunnel does not pass the cloud exit criteria below; those criteria are not prerequisites for reporting the local checkpoint.
+**Current execution scope, September 22:** the selected DigitalOcean deployment is complete, including constrained Linux tests, canonical-archive restore, public HTTPS checks and a downloaded-backup restore. The Cloudflare free-tier criteria below are retained as the original alternative evaluation; they are not pending launch gates for the selected VM.
 
-**Execution started September 16, 2026:** see [Phase 1 status and measurements](reports/PHASE1_STATUS.md). The five-minute, 24-hour local observation pilot is running. Local storm benchmarks flag a CPU risk for an ordinary free Worker and insufficient storage margin when both raw and normalized history are retained permanently. A free Durable Object compute option and compressed originals with a 48-hour normalized cache are the revised candidates; the latter models at 5.47 GB including the 10,000-feature reserve case and passes local byte-exact replay checks. Cloud validation is pending. Phase 1 is not yet accepted; the user's subsequent request to proceed authorized local Phase 2 implementation while these observations continue.
+**Local observation review completed September 17, 2026:** see [Phase 1 status and measurements](reports/PHASE1_STATUS.md). All 290 expected slots in the 24-hour observed span were valid, HTML totals matched, and every pilot capture replayed from the durable archive. Eight IDs had corrected start times and 27 had coordinate changes; event identity and location remain provisional. Local storm benchmarks flag CPU risk for an ordinary free Worker. A free Durable Object and compressed originals with a 48-hour normalized cache remain candidates. The revised 10,000-feature reserve scenario is approximately **6.09 GB including retained HTML**, superseding the earlier incomplete 5.47 GB estimate; weather and provider account usage remain separate. At that September 17 checkpoint, the Cloudflare-specific gate remained open and the local trial continued. The subsequent VM deployment supersedes the hosting choice; it does not claim the unrun Cloudflare benchmark passed.
 
 - Capture representative fixtures and measure feed updates for at least 24 hours at five-minute intervals.
 - Verify source field meanings, timezone assumptions, ID stability, and completeness checks; compare the feed total with the HTML summary using independently recorded times.
@@ -404,13 +419,13 @@ The outage-only estimates above do **not** include weather imagery, numeric grid
 - Confirm that the protected year plus at least 30 days of offline-PC headroom, transfer staging, and cleanup grace fits free storage under the chosen cadence and storm model. Evaluate free-tier compute alternatives if Workers fails its CPU target.
 - Validate the provisional five-minute cadence and storage model against measured captures. The provisional archive directory is recorded above; its installation capacity check belongs to Phase 4B. Audience, indefinite-detail intent, free-first priority, and irregular PC availability with 30 days of headroom are already settled.
 
-**Exit:** the selected free-tier runtime can archive and process the supported payload range with headroom, and a year's storage fits the measured free budget with archive reserve. If either fails, revise the free architecture/cadence before selecting a paid option. The $0 design is not accepted solely because a quiet-day sample works.
+**Original free-tier exit criterion:** the proposed free runtime and protected-year storage had to pass their measured limits. That $0 design was not accepted. The owner subsequently selected the paid VM, whose actual deployment checks are recorded separately; long-term storm growth and storage headroom still require observation.
 
 ### Phase 2: durable collection
 
-**Local execution started September 16, 2026:** see [Phase 2 status](reports/PHASE2_STATUS.md). Immutable gzip archives, parser-version replay, a compact SQLite index, leases/retries, bounded rollup maintenance and freshness/pressure reporting were implemented with 34 passing tests at that checkpoint. A seven-day local trial is running and reuses Phase 1 captures until that pilot ends. Production cloud adapters/deployments and the full seven-day acceptance criteria remain unverified; temporary dashboard access through the separately requested Quick Tunnel does not change this collection scope.
+**Local execution started September 16, 2026:** see [Phase 2 status](reports/PHASE2_STATUS.md). Immutable gzip archives, parser-version replay, a compact SQLite index, leases/retries, bounded rollup maintenance and freshness/pressure reporting were implemented with 34 passing tests at that checkpoint. The September 17 review verified all 290 mirrored pilot captures and seven direct captures after a successful handoff, with 100% observed slot coverage and a 297-snapshot isolated restore. The September 18 continuation restored 602/602 captures at its 18:40 UTC cutoff. The local run was later stopped for cloud cutover on September 22, without a seven-day acceptance claim. Production restored 1,722 attempts / 1,635 snapshots before collecting on its independent continuous schedule. The local `collector:accept-trial` evaluator does not accept a handoff as trial completion.
 
-- Implement versioned parsing, immutable R2 capture, D1 summaries, idempotency, bounded retries, and freshness reporting.
+- Implement versioned parsing, immutable filesystem capture, SQLite summaries, idempotency, bounded retries and freshness reporting.
 - Deploy separate development and production resources with environment-specific bindings and narrow deployment credentials.
 - Add incremental rollups, pressure-based retention configuration, and a replay path for archived captures. No unconditional one-year expiration.
 - Run a seven-day collection pilot before relying on the service.
@@ -419,22 +434,30 @@ The outage-only estimates above do **not** include weather imagery, numeric grid
 
 ### Phase 3: dashboard and descriptive analysis
 
-**Local implementation completed September 16, 2026:** see [Phase 3 status](reports/PHASE3_STATUS.md). The loopback dashboard provides linked historical maps/totals/charts, a historical density heatmap, Census block-group per-capita maps, bounded exports, explained anomaly rules and coverage indicators. That checkpoint had 67 passing tests and desktop/mobile-viewport checks; dashboard changes were committed and pushed in `f9c42e3`. It reads the local archive while the earlier pilots continue. The temporary authenticated phone preview was separately authorized with an explicit expiry; permanent cloud serving and provider validation remain deferred. Weather source/cache validation is recorded in Phase 3A below; Phase 4 has not started.
+**Local implementation completed September 16, 2026:** see [Phase 3 status](reports/PHASE3_STATUS.md). The loopback dashboard provides linked historical maps/totals/charts, a density heatmap, Census block-group per-capita maps, bounded exports, explained anomaly rules and coverage indicators. That checkpoint had 67 passing tests and desktop/mobile-viewport checks; its dashboard changes were committed in `f9c42e3`. The 24-hour pilot completed, and the local collector subsequently handed off to the VM. September 17/18 preview sessions are historical. Public HTTPS serving was verified on DigitalOcean on September 22. Weather checkpoints and Phase 4A audit progress are recorded below; separate dashboard publication of legacy history completed September 18.
 
 - Build the one-page dashboard, time-linked map/chart, historical retrieval, and bounded exports.
 - Add the simple anomaly rules with visible explanations and coverage flags. Enable the robust baseline only after enough history exists.
 - Preserve historical heatmap and Census per-capita views, provisional event identity, uncertainty and coverage semantics.
-- For eventual production serving, verify that archive/admin authentication cannot be bypassed by public routes or cached responses. Keep current local/temporary-preview access as authorized.
+- Preserve the verified production boundary: raw archive/admin/write routes are unavailable publicly, and administration/backups use SSH. Recheck that boundary after server or proxy changes.
 
-**Exit:** selecting a timestamp available to the serving archive reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history. Repeat these checks against cloud-resident data when cloud validation resumes.
+**Exit:** selecting a timestamp available to the serving archive reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history. Public route checks against cloud-resident data passed at deployment; desktop/phone visual checks retain their earlier local dates because browser automation was unavailable during deployment.
 
 ### Phase 3A: local weather sources, radar replay and rainfall history
 
-**Source/cache and dashboard checkpoints implemented September 16–17, 2026:** see [Phase 3A findings](reports/PHASE3A_STATUS.md). Exact timestamped radar originals, numeric one-hour MRMS subsets, GHCNh station files and MEG warning samples replay through an isolated bounded local cache. The dashboard now has synchronized radar/rainfall layers and a regional 24-hour temperature/wind plot, with desktop/phone checks and 86 passing tests at that checkpoint. Recent KMEM METAR reports are labeled separately from the delayed GHCNh archive, whose downloaded 2026 file ends August 26. Weather preparation remains manual and bounded. Subsequent accumulation and spatial checks are recorded below; comprehensive event/quality handling remains pending. This stage depends on local Phase 3 interfaces, not cloud deployment, desktop transfer or legacy import.
+**Source/cache and dashboard checkpoints implemented September 16–17, 2026:** see [Phase 3A findings](reports/PHASE3A_STATUS.md). Timestamped radar originals, numeric one-hour MRMS subsets, GHCNh station files and MEG warning samples replay through an isolated bounded local cache. Synchronized layers and a regional 24-hour temperature/wind plot passed desktop/phone checks and 86 tests at that checkpoint. Its GHCNh snapshot ended August 26; the later retained revision reaches September 9. Subsequent accumulation, period, quality and event checks are recorded below. Study preparation remains explicit and bounded; September 18 adds the separate rolling display-weather runner through the trial end. This stage depends on local Phase 3 interfaces, not cloud deployment, desktop transfer or legacy import.
 
 **Earlier numeric rainfall checkpoint, September 17, 2026:** [48/72-hour results](reports/RAINFALL_WINDOW_STATUS.md) reproduced 72 originals and 302,400 hourly cell values with an independent decoder, preserved missing intervals/cells, and validated native-cell area intersections for all 685 Census block groups. At that checkpoint one boundary area was partly outside the crop, 95 tests passed, and the cache used 134.0 MiB. The subsequent dashboard checkpoint below supersedes that extent, test count and cache size; the old measurements remain historical evidence.
 
-**Rainfall dashboard checkpoint implemented September 17, 2026:** [latest results](reports/RAINFALL_DASHBOARD_STATUS.md) close that boundary gap using saved originals, cover all 685 block groups, and expose prepared 24/48/72-hour rainfall with exact periods, coverage, native-cell inspection and a matching outage-history chart. The current sample has no imported outage captures, which remains explicit. All 99 tests and desktop/phone checks pass; 345,600 expanded hourly cell values were independently verified. The cache uses about 140.0 MiB with no new downloads or changed limits. Broader period preparation and a prolonged-rain case are next; automatic collection, legacy import and comparative analysis remain later stages.
+**Rainfall dashboard checkpoint implemented September 17, 2026:** [results](reports/RAINFALL_DASHBOARD_STATUS.md) close that boundary gap using saved originals, cover all 685 block groups, and expose prepared 24/48/72-hour rainfall with exact periods, coverage, native-cell inspection and a matching outage-history chart. At that checkpoint the sample had no imported outage captures; current-feed rainfall charts still show no captures for those historical dates, while separate legacy/comparison pages now supply regional totals. All 99 tests and desktop/phone checks passed; 345,600 expanded hourly cell values were independently verified. The cache used about 140.0 MiB at that cutoff. Broader period preparation, the prolonged-rain case, separate legacy publication, four Phase 5 cases and bounded automatic display-weather refresh subsequently completed.
+
+**Broader weather checkpoint, September 17, 2026:** [period validation](reports/WEATHER_PERIODS_STATUS.md) adds selectable 24/48/72-hour windows, resumable bounded batches and atomic multi-period publication. A 72-hour Francine case has complete rainfall coverage for all 685 block groups, 42 wet hours across three UTC days and independent verification of 345,600 hourly values. Explicit station refresh preserves prior revisions; the newer 2026 GHCNh snapshot reaches September 9. Desktop/phone checks and 109 test entries passed at that checkpoint. Its roughly 223.5 MiB use under the original 256 MiB cap prompted the storage work below. Bounded station-quality, event/zone-warning checks and rolling weather refresh/retention subsequently completed. Additional source families remain open; the later deployment provides continuous cloud weather refresh.
+
+**Storage implementation and pilot revalidation, September 17, 2026:** the [latest checkpoint](reports/STORAGE_AND_PILOT_STATUS.md) raises the weather cap to 1 GiB and stores station originals losslessly as gzip under unchanged source identities. Verified migration recovered 78.0 MiB, leaving about 145.7 MiB in use after offline replay. All 168 referenced weather originals verify and 115 test entries pass. The requested pilot revalidation confirms 290/290 valid observations over more than 24 hours; all 354 captures in the combined archive at the new cutoff replay and restore correctly. Existing download limits and source-evidence preservation remain in force. This is local validation; cloud and seven-day acceptance remain separate.
+
+**Station quality checkpoint, September 17 around 7:02 PM CDT:** [station-quality results](reports/STATION_QUALITY_STATUS.md) add source-specific temperature/dew-point, wind/gust and precipitation eligibility. Trace, missing and excluded readings remain distinct; nominal precipitation hours never sum intermediate reports. All 123 tests passed and independent provenance verification matched 641 records / 3,205 field-metadata sets. Unsupported recent source/QC combinations remain excluded from numeric comparisons. Cache use was 146.5 MiB of 1 GiB at that cutoff. The next event/zone-warning checkpoint subsequently completed below.
+
+**Event/zone-warning checkpoint, September 17 around 8:00 PM CDT:** [event context results](reports/EVENT_CONTEXT_STATUS.md) complete the bounded source check for six cases, with separate county/forecast-zone identities, explicit CST-6 event times, retrospective warning status and observed archive-month limits. All 134 tests passed; independent checks reproduced 13 finalized events, eight warnings and their geometries. Offline replay reproduced 12 derivative hashes without requests. Cache use was 189.9 MiB of 1 GiB and the collector had 389 valid slots at that cutoff. Phase 4A audits subsequently completed; separate legacy dashboard integration and the initial matched comparisons subsequently completed.
 
 - Validate the documented radar, MRMS, station and event/warning sources with bounded samples. Confirm actual archive coverage, valid-time conventions, projections, units, quality flags, product versions and reuse/caching conditions; record source manifests.
 - Implement isolated weather retrieval, bounded local caches and numeric subset storage with checksums, retries and availability reporting. Weather failures must leave outage collection and replay intact.
@@ -451,6 +474,8 @@ Split this phase into independent tracks so weather analysis can use older local
 
 #### Phase 4A: legacy history import
 
+**Current status:** [overlap/staging](reports/LEGACY_HISTORY_AUDIT.md), [timezone recovery](reports/LEGACY_TIMEZONE_RECOVERY.md) and [bounded capture coverage](reports/LEGACY_COVERAGE_AUDIT.md) are complete. The verified catalog resolves 53,273 totals and all 18,906 grid snapshots. One consolidated timestamp and one additional nonempty original remain exceptions. The availability catalog inventories 53,679 captures across six selected trees; it is not an exhaustive scan of every commit. The [separate legacy dashboard](reports/LEGACY_DASHBOARD_STATUS.md) now serves all verified totals and grid snapshots with source boundaries, missing intervals and exclusions. Its read-only publication is independent of the live collector. Four regional rainfall/wind/cold/heat cases and original-grid cold summaries are complete in Phase 5; broader supported comparisons require additional compatible evidence.
+
 - Import deduplicated legacy total-count observations and supported grid snapshots through a separate versioned adapter. Preserve original RDS/RData files and provenance; do not run the old scraper or copy its credentials/configuration into the new deployment.
 - Populate historical storm comparisons with the measured 2022–2025 observations, explicitly marking gaps, unavailable geometry, and source-format differences. Do not assume the current checkout contains every older raw file referenced by the consolidated data.
 - Audit totals and spatial coverage independently, reconcile timestamp/DST conventions, and expose the original grid geometry. Pair verified legacy periods with Phase 3A weather; total-only periods support regional comparisons only. Weather backfill does not fill outage gaps.
@@ -459,7 +484,7 @@ Split this phase into independent tracks so weather analysis can use older local
 
 #### Phase 4B: verified desktop transfer and cloud retention
 
-**Deferred until cloud work is resumed.** This track depends on a validated cloud archive and the later desktop installation decisions; it is not a prerequisite for local weather replay or analysis.
+**Local transfer core and on-demand cloud backups are implemented; automated offload remains uninstalled.** The [autonomous checkpoint](reports/DEVELOPMENT_COMPLETION_STATUS.md) implements bounded bundles, resumed downloads, hashes, SQLite receipts, restore, authenticated verification and non-executable retention eligibility, and replays an actual 89-capture transferred partition. Cloud archive access and an ACL-protected SSH key are now available. The separate full-backup command has passed download and restore verification. Durable receipt transactions, cleanup journals, a final long-term destination and recurring installation remain future work. This is independent of local weather analysis.
 
 - Install the Windows archive downloader, receipt protocol, cloud archive catalog, and pressure-triggered cleanup. Keep detailed historic maps available in the cloud while capacity permits.
 - Exercise offline/resumed downloads, a full disk, corrupted parts, duplicate receipts, protected-year boundaries, and restoration of a transferred historical map before enabling cloud cleanup.
@@ -468,7 +493,9 @@ Split this phase into independent tracks so weather analysis can use older local
 
 ### Phase 5: weather-condition comparisons and historical case studies
 
-**Status: planned.** Depends on Phase 3A weather and verified outage coverage. Phase 4A is required for legacy-period comparisons; sufficiently observed current-format episodes can be analyzed without it. Phase 4B and permanent cloud hosting are independent.
+**Autonomous continuation, September 18:** [cold/heat comparisons, native-grid cold summaries and bounded weather maintenance](reports/DEVELOPMENT_COMPLETION_STATUS.md) are now implemented and independently verified. The bounded additional rainfall/wind screen found no eligible case without changing policy. Missing snow/ice coverage, one temperature case per category, regional station precision and the old archive gap limit broader conclusions. The earlier initial-case checkpoint below remains dated evidence.
+
+**Earlier rainfall/wind checkpoint, September 18, 2026:** [two regional case studies](reports/WEATHER_COMPARISON_STATUS.md) provide aligned hourly charts, backward-only 0/1/3-hour additional lags, condition groups, joint coverage, source hashes and downloads. The [matched reference checkpoint](reports/WEATHER_REFERENCE_STATUS.md) adds calendar/capture/weather selection independent of outage levels, paired snapshots, shared lag rules, visible exclusions and CSV exports. Both rainfall/wind cases lack outage geometry and sufficient interruption-burden coverage; those measures remain unavailable. The later continuation adds cold/heat studies and supported native-grid cold summaries. Additional independent storms, snow/ice cases and richer geographic analysis remain constrained by coverage and source compatibility. Phase 5 depends on Phase 3A weather and verified outage coverage. Phase 4A is required for legacy-period comparisons; sufficiently observed current-format episodes can be analyzed without it. Phase 4B and permanent cloud hosting are independent.
 
 - Define and version episode boundaries, condition labels, lags, reference periods and joint coverage rules. Include heavy/prolonged rainfall, flash-flood episodes, wind, snow, ice/freezing rain, heat waves and cold without treating warning/derived labels as observed damage.
 - Join native-resolution weather to the current point/grid history and the separate legacy polygons. Preserve Census population vintages and margins of error; do not redistribute legacy area customer totals into block groups without support.
@@ -482,7 +509,7 @@ Split this phase into independent tracks so weather analysis can use older local
 
 - Parser fixtures: empty valid feed, malformed JSON, missing/blank fields, duplicate IDs, invalid counts/coordinates, and schema changes.
 - Time fixtures: explicit source format, Central daylight/standard time, ambiguous DST values, and missing restoration estimates.
-- Pipeline cases: repeated slot, overlapping/delayed run, 429 backoff, failed R2 write, failed D1 commit, raw capture awaiting processing, and replay without double-counting.
+- Pipeline cases: repeated slot, overlapping/delayed run, 429 backoff, failed archive write, failed SQLite commit, raw capture awaiting processing, and replay without double-counting.
 - Analytics cases: unchanged observations, genuine zero, suspicious empty feed, an outage disappearing/reappearing, partial coverage, and correct customer-minute bucket boundaries.
 - Operational checks: storm-size resource use, cost telemetry, stale-data banner and heartbeat detection, public-read quota protection, and a restore/replay exercise from archived data.
 - Retention checks: desktop offline for 30 days under the storage-growth model, successful catch-up after it returns, partial downloads/deletions, checksum mismatch, expired machine credentials, payloads shared with protected observations, and preventing cleanup without a matching verified receipt.
@@ -494,13 +521,14 @@ Future optional additions should be driven by use: one-minute storm collection, 
 
 ## 11. Open decisions and questions for the owner
 
-**No blocking user answers are needed to maintain this plan or prepare the next local weather step.** Local collection with explicitly requested temporary tunnel access, the free-first priority, Memphis/Shelby County scope, five-minute provisional cadence, retention intent, visual style and requested weather categories already provide enough direction. Both outage-event and peak-customer per-capita measures are implemented, so their default/toggle choice is not an unresolved requirement.
+The selected VM, public-IP access, five-minute outage cadence, 30-minute weather refresh, evidence retention and dashboard scope are settled. Cloud account access is configured and deployment is complete. The former PC trial is stopped; its old deadline is not a future acceptance instruction. Both outage-event and peak-customer per-capita measures are implemented.
 
 | Decision | Needed now? | Default or trigger |
 | --- | --- | --- |
-| Specific storms or weather categories to prioritize | Optional | Start with rainfall/wind, then snow/ice and heat; use verified legacy episodes after Phase 4A. A named event or date range can change the order. |
-| Permanent cloud hosting/collection or further temporary preview sessions | No; production cloud work remains deferred | The explicitly requested September 17 Quick Tunnel is deployed with its own eight-hour expiry. Preserve that expiry; do not restart it automatically. Further deployment/preview scope follows an explicit request. |
-| Final long-term archive directory, available disk budget and any second copy | No; needed for Phase 4B installation | The local trial uses `C:\Developer\mlgw-outage-scraper\data`; the provisional future archive is `C:\Developer\mlgw-outage-scraper\archive` with a 20 GB free-space floor. Recheck capacity and confirm the installation destination at that stage. |
-| Any paid service if measured requirements cannot fit free resources | No; no payment is authorized | Exhaust suitable free options and report the concrete capacity tradeoff before a spending decision. |
+| Specific storms or weather categories to prioritize | Optional | Expand only when independent coverage and suitable references support another case. |
+| Domain name | Optional | Continue using the verified public-IP HTTPS origin. |
+| Recurring backup destination/schedule and external alerts | For further operational automation | Current backups are on demand; health checks log on the VM. |
+| Final long-term archive directory, disk budget and second copy | Before automatic offload installation | Current verified backups use `data/deployment/backups`; the provisional long-term archive is `C:\Developer\mlgw-outage-scraper\archive`. Recheck destination capacity at that stage. |
+| Additional paid storage or backup products | Only if needed and requested | The selected $12/month VM is active; further paid products are not automatically enabled. |
 
-Provider availability, station choice, weather thresholds, geographic joins, sufficient sample size and runtime/storage performance are research and validation work for the implementation, not questionnaires to hand back to the owner. Starting a subsequent stage remains a separate instruction from updating this design plan.
+Source compatibility, geographic joins, sample size and storage growth remain implementation/validation work. A subsequent feature or automation stage remains separate from this documentation audit.

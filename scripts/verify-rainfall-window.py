@@ -10,12 +10,17 @@ import io
 import json
 import math
 import struct
+import argparse
 from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
 cache = Path('data/weather/cache')
-report = json.loads(Path('reports/rainfall-window-validation.json').read_text())
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--report', default='reports/rainfall-window-validation.json')
+args = parser.parse_args()
+report_path = Path(args.report)
+report = json.loads(report_path.read_text())
 def verified(path, digest):
     content = path.read_bytes()
     assert hashlib.sha256(content).hexdigest() == digest, path
@@ -99,5 +104,5 @@ for identifier, target in samples.items():
 result = {'method': 'Independent Pillow GRIB PNG unpacking and NumPy sums; analytic spherical cell areas; Pillow equal-area polygon rasterization',
           'sourceHours': len(arrays), 'sourceCellsChecked': int(stack.size), 'windows': checks, 'spatialSamples': spatial,
           'spatialTolerances': {'meanMm': .08, 'coverageFraction': .003, 'areaRelative': .005}}
-Path('reports/rainfall-window-independent.json').write_text(json.dumps(result, indent=2))
+report_path.with_name(report_path.stem.removesuffix('-validation') + '-independent.json').write_text(json.dumps(result, indent=2))
 print(json.dumps(result, indent=2))

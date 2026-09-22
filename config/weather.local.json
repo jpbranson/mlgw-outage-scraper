@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "cacheBytes": 268435456,
+  "cacheBytes": 1073741824,
   "minimumFreeBytes": 20000000000,
   "maxResponseBytes": 33554432,
   "maxRunBytes": 100663296,

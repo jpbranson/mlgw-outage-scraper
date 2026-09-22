@@ -1,0 +1,33 @@
+{
+  "version": "weather-comparison-v1",
+  "referencePolicy": "config/weather-reference-policy.json",
+  "referenceSelection": "reports/weather-reference-selection.json",
+  "rules": {
+    "outageMaxGapMinutes": 7.5,
+    "minimumBurdenCoverage": 0.9,
+    "minimumGroupHours": 6,
+    "rainThresholdMm": 0.1,
+    "windThresholdMs": 10,
+    "lagHours": [0, 1, 3]
+  },
+  "episodes": [
+    {
+      "id": "june-2023",
+      "name": "June 24–26, 2023",
+      "from": "2023-06-24T00:00:00Z",
+      "to": "2023-06-27T00:00:00Z",
+      "rainfallReport": "reports/rainfall-window-validation.json",
+      "eventCase": "wet",
+      "referenceRainfallReport": "reports/rainfall-reference-june-2023-validation.json"
+    },
+    {
+      "id": "september-2024",
+      "name": "September 12–14, 2024 · Francine",
+      "from": "2024-09-12T00:00:00Z",
+      "to": "2024-09-15T00:00:00Z",
+      "rainfallReport": "reports/rainfall-francine-2024-validation.json",
+      "eventCase": "francine",
+      "referenceRainfallReport": "reports/rainfall-reference-september-2024-validation.json"
+    }
+  ]
+}

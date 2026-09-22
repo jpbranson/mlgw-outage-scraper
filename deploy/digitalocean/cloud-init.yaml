@@ -1,0 +1,48 @@
+#cloud-config
+package_update: true
+package_upgrade: false
+packages:
+  - ca-certificates
+  - curl
+  - xz-utils
+  - caddy
+  - ufw
+  - unattended-upgrades
+users:
+  - default
+  - name: mlgw
+    system: true
+    shell: /usr/sbin/nologin
+    homedir: /var/lib/mlgw
+    lock_passwd: true
+ssh_pwauth: false
+write_files:
+  - path: /usr/local/sbin/mlgw-bootstrap
+    owner: root:root
+    permissions: '0755'
+    content: |
+      #!/usr/bin/env bash
+      set -euo pipefail
+      umask 027
+      install -d -m 0755 /opt/mlgw/releases /opt/node
+      install -d -o mlgw -g mlgw -m 0750 /var/lib/mlgw/data /var/log/mlgw
+      work=$(mktemp -d /var/tmp/mlgw-node.XXXXXX)
+      cd "$work"
+      version=v24.19.0
+      archive="node-${version}-linux-x64.tar.xz"
+      curl --fail --silent --show-error --proto '=https' --tlsv1.2 --retry 3 -O "https://nodejs.org/dist/${version}/${archive}"
+      curl --fail --silent --show-error --proto '=https' --tlsv1.2 --retry 3 -O "https://nodejs.org/dist/${version}/SHASUMS256.txt"
+      awk -v file="$archive" '$2 == file { print }' SHASUMS256.txt > selected.sha256
+      test -s selected.sha256
+      sha256sum --check selected.sha256
+      tar -xJf "$archive" --strip-components=1 -C /opt/node
+      /opt/node/bin/node --version
+      ufw allow OpenSSH
+      ufw allow 80/tcp
+      ufw allow 443/tcp
+      ufw --force enable
+      systemctl enable --now unattended-upgrades
+      touch /var/lib/mlgw/bootstrap-complete
+runcmd:
+  - ['/usr/local/sbin/mlgw-bootstrap']
+final_message: 'MLGW host bootstrap finished. Application collection is not installed or started.'

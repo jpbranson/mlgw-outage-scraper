@@ -1,0 +1,9 @@
+{
+  "name": "Calendar-matched reference for September 2024",
+  "reportId": "rainfall-reference-september-2024",
+  "from": "2024-08-22T00:00:00Z",
+  "to": "2024-08-25T00:00:00Z",
+  "hoursPerBatch": 24,
+  "periodHours": [72],
+  "purpose": "Reference weather selected using calendar, capture timestamps and station weather only. Outage levels are not selection criteria. Regional rainfall and paired-hour eligibility require separate verification."
+}

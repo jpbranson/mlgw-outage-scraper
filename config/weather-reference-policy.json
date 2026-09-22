@@ -1,0 +1,14 @@
+{
+  "version": "matched-weather-reference-v1",
+  "candidateDaysBefore": [7, 14, 21, 28],
+  "timezone": "America/Chicago",
+  "hours": 72,
+  "anchorMinute": 30,
+  "anchorToleranceMinutes": 15,
+  "pairToleranceMinutes": 10,
+  "minimumAnchorPairs": 48,
+  "minimumStationCoverage": 0.9,
+  "referenceRainThresholdMm": 0.1,
+  "referenceWindThresholdMs": 10,
+  "minimumGroupPairs": 6
+}

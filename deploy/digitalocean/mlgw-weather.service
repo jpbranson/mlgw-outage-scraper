@@ -1,0 +1,28 @@
+[Unit]
+Description=MLGW rolling weather refresh
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/var/lib/mlgw/collection-enabled
+
+[Service]
+Type=simple
+User=mlgw
+Group=mlgw
+WorkingDirectory=/opt/mlgw/current
+Environment=NODE_ENV=production
+Environment=MLGW_DEPLOYMENT=production
+ExecStart=/opt/node/bin/node scripts/production-weather.mjs
+Restart=on-failure
+RestartSec=60
+TimeoutStopSec=360
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mlgw/data/weather
+MemoryMax=768M
+Nice=5
+
+[Install]
+WantedBy=multi-user.target

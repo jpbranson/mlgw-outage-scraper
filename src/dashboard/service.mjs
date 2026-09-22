@@ -41,10 +41,11 @@ const text = value => typeof value === 'string' ? value.slice(0, 1000) : null;
 const publicTime = value => ({ utc: value?.utc ?? null, raw: text(value?.raw), status: text(value?.status) });
 
 export class DashboardService {
-  constructor(root, { now = () => Date.now() } = {}) {
+  constructor(root, { now = () => Date.now(), localOnly = true } = {}) {
     this.db = new DatabaseSync(join(root, 'index.sqlite'), { readOnly: true, timeout: 5000 });
     this.archive = new Archive(join(root, 'archive'), { readOnly: true });
     this.now = now;
+    this.localOnly = localOnly;
   }
   close() { this.db.close(); }
   row(id) { return this.db.prepare(`${SELECT} WHERE ${GOOD} AND s.id=?`).get(id); }
@@ -62,7 +63,7 @@ export class DashboardService {
     const status = ageMinutes == null || ageMinutes >= 15 ? 'stale' : ageMinutes > 10 || !['valid', 'duplicate_slot'].includes(attempt?.outcome) ? 'warning' : 'ok';
     return { checkedAt: iso(this.now()), status, ageMinutes, latest: publicRow(latest), firstCaptureAt: iso(first),
       lastAttemptAt: iso(attempt?.received_ms), lastAttemptOutcome: attempt?.outcome ?? null,
-      source: SOURCE, localOnly: true };
+      source: SOURCE, localOnly: this.localOnly };
   }
   summary(row) {
     const previous = this.db.prepare(`${SELECT} WHERE ${GOOD} AND s.captured_ms<? ORDER BY s.captured_ms DESC LIMIT 1`).get(row.at);

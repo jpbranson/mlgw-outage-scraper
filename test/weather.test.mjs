@@ -38,6 +38,36 @@ test('cache refuses arbitrary URLs and multiple writers',async()=>{
   try {await assert.rejects(cache.acquire({...request(),url:'https://example.com'}),/allowlist/);assert.throws(()=>make(dir),/EEXIST/);}
   finally{cache.close();}
 });
+test('explicit station refresh preserves previous manifests, originals and pinned offline reads',async()=>{
+  const dir=root(),req=sourceRequest('station','2026-01-01T00:00:00Z');let calls=0;
+  const cache=make(dir,{fetchImpl:async()=>new Response(++calls===1?'original station snapshot':'revised station snapshot')});
+  try {
+    const first=await cache.acquire(req);assert.equal((await cache.acquire(req)).body.sha256,first.body.sha256);assert.equal(calls,1);
+    const revised=await cache.acquire(req,{refresh:true});assert.equal(revised.refresh.previousBodySha256,first.body.sha256);assert.equal(revised.refresh.changed,true);
+    assert.equal(cache.readBody(first).toString(),'original station snapshot');assert.equal(cache.readBody(revised).toString(),'revised station snapshot');
+    assert.equal((await cache.acquire(req,{offline:true})).body.sha256,revised.body.sha256);assert.equal(calls,2);
+    const revisions=readdirSync(join(dir,'revisions')).map(f=>JSON.parse(readFileSync(join(dir,'revisions',f),'utf8')));
+    assert.ok(revisions.some(r=>r.body.sha256===first.body.sha256));assert.ok(revisions.some(r=>r.body.sha256===revised.body.sha256));
+    await assert.rejects(cache.acquire(req,{refresh:true,offline:true}),/online refresh/);
+    await assert.rejects(cache.acquire(request(),{refresh:true}),/station/);
+  }finally{cache.close();}
+});
+test('failed station refresh retains last good snapshot and provider backoff across processes',async()=>{
+  const dir=root(),req=sourceRequest('station','2026-01-01T00:00:00Z');let calls=0,now=Date.parse('2026-09-17T00:00:00Z');
+  let cache=make(dir,{now:()=>now,fetchImpl:async()=>++calls===1?new Response('station snapshot'):new Response('',{status:429,headers:{'retry-after':'120'}})});
+  const first=await cache.acquire(req),failure=await cache.acquire(req,{refresh:true});cache.close();assert.equal(failure.availability,'rate-limited');
+  cache=make(dir,{now:()=>now,fetchImpl:async()=>assert.fail('provider pause must persist')});
+  try{
+    assert.equal((await cache.acquire(req,{offline:true})).body.sha256,first.body.sha256);
+    assert.equal((await cache.acquire(req,{refresh:true})).availability,'provider-paused');
+    assert.equal((await cache.acquire(sourceRequest('station','2025-01-01T00:00:00Z'))).availability,'provider-paused');
+    assert.equal(cache.readBody(first).toString(),'station snapshot');
+  }finally{cache.close();}
+});
+test('unchanged station refresh deduplicates original bytes and reports no revision',async()=>{
+  const dir=root(),req=sourceRequest('station','2026-01-01T00:00:00Z'),cache=make(dir,{fetchImpl:async()=>new Response('same snapshot')});
+  try{await cache.acquire(req);const result=await cache.acquire(req,{refresh:true});assert.equal(result.refresh.changed,false);assert.equal(readdirSync(join(dir,'objects')).length,1);}finally{cache.close();}
+});
 test('cache distinguishes missing observations and retains a negative cache',async()=>{
   let calls=0;const cache=make(root(),{fetchImpl:async()=>{calls++;return new Response('missing',{status:404});}});
   try {const a=await cache.acquire(request());assert.equal(a.availability,'unavailable');assert.equal(a.body,undefined);await cache.acquire(request());assert.equal(calls,1);}

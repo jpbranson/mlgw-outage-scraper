@@ -6,7 +6,7 @@ import {RequestError} from './service.mjs';
 const HOUR=3600000;
 const digest=b=>createHash('sha256').update(b).digest('hex');
 export class WeatherService {
-  constructor(root){this.root=resolve(root);}
+  constructor(root,{rollingRoot}={}){this.root=resolve(root);this.rolling=rollingRoot?new WeatherService(rollingRoot):null;}
   catalog() {
     const path=join(this.root,'published/catalog.json');
     try {
@@ -17,10 +17,15 @@ export class WeatherService {
         if(!['radar','rainfall','metar','rainfall-period'].includes(e.product)||!/^[a-f0-9]{64}$/.test(e.sha256)||!Number.isFinite(instant(e.validAt)))throw Error('Weather catalog entry invalid');
         if(e.product==='rainfall-period'&&(![24,48,72].includes(e.hours)||instant(e.intervalEnd)!==instant(e.validAt)||instant(e.intervalEnd)-instant(e.intervalStart)!==e.hours*HOUR))throw Error('Invalid rainfall period');
       }
+      if(this.rolling) {
+        try {const live=this.rolling.catalog();const known=new Set(c.entries.map(e=>e.identity));c.entries.push(...live.entries.filter(e=>!known.has(e.identity)).map(e=>({...e,rolling:true})));c.updatedAt=[c.updatedAt,live.updatedAt].filter(Boolean).sort().at(-1)??null;}
+        catch {c.rollingUnavailable=true;}
+      }
       return c;
     }catch(e){if(e.code==='ENOENT')return {version:1,entries:[],updatedAt:null};throw e;}
   }
   read(entry) {
+    if(entry.rolling&&this.rolling)return this.rolling.read({...entry,rolling:false});
     const path=join(this.root,'derived',`${entry.sha256}.json`);
     if(statSync(path).size>2*1024*1024)throw Error('Weather asset limit');
     const bytes=readFileSync(path);

@@ -4,7 +4,13 @@ import { extname, resolve, relative, isAbsolute } from 'node:path';
 import { RequestError } from './service.mjs';
 
 export function createDashboardServer(service, { staticRoot, tiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120, weather } = {}) {
+  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120, weather, legacy, comparisons, publicOrigin } = {}) {
+  let publicUrl;
+  if (publicOrigin) {
+    publicUrl = new URL(publicOrigin);
+    if (!['http:', 'https:'].includes(publicUrl.protocol) || publicUrl.username || publicUrl.password || publicUrl.pathname !== '/' || publicUrl.search || publicUrl.hash)
+      throw Error('PUBLIC_ORIGIN must be one HTTP(S) origin without credentials or a path');
+  }
   const tileOrigin = tiles ? new URL(tiles).origin : '';
   if (tiles && !tiles.startsWith('https://')) throw new Error('Tile URL must use HTTPS, or be empty to disable tiles.');
   let windowStart = 0, requests = 0;
@@ -19,14 +25,46 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
     };
     try {
       const allowedHosts = [`127.0.0.1:${req.socket.localPort}`, `localhost:${req.socket.localPort}`];
-      if (!allowedHosts.includes(req.headers.host) || (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`))
-        throw new RequestError('Local same-origin access only.', 403);
+      const isPublic = publicUrl && req.headers.host === publicUrl.host;
+      const expectedOrigin = isPublic ? publicUrl.origin : `http://${req.headers.host}`;
+      if ((!allowedHosts.includes(req.headers.host) && !isPublic) || (req.headers.origin && req.headers.origin !== expectedOrigin))
+        throw new RequestError('Same-origin access only.', 403);
       if (!['GET', 'HEAD'].includes(req.method)) { res.setHeader('Allow', 'GET, HEAD'); throw new RequestError('Read-only endpoint.', 405); }
       const url = new URL(req.url, `http://${req.headers.host}`), path = url.pathname;
       if (url.search.length > 1024 || path.length > 240) throw new RequestError('Request exceeds limit.');
       if (path.startsWith('/api/')) {
         if (Date.now() - windowStart >= 60000) { windowStart = Date.now(); requests = 0; }
         if (++requests > requestLimit) { res.setHeader('Retry-After', '60'); throw new RequestError('Local request budget reached. Retry in one minute.', 429); }
+        if (path.startsWith('/api/legacy/') && comparisons && ['comparison','comparisons'].includes(url.searchParams.get('view'))) {
+          if (path === '/api/legacy/catalog') return send(200, comparisons.catalog());
+          if (path === '/api/legacy/series') return send(200, comparisons.series(url.searchParams));
+          if (path === '/api/legacy/export.csv') {
+            res.setHeader('Content-Disposition', 'attachment; filename="mlgw-weather-comparison.csv"');
+            return send(200, comparisons.csv(url.searchParams), 'text/csv; charset=utf-8');
+          }
+          throw new RequestError('Comparison route not found.', 404);
+        }
+        if (path.startsWith('/api/legacy/') && legacy) {
+          if (path === '/api/legacy/catalog') return send(200, legacy.catalog());
+          if (path === '/api/legacy/series') return send(200, legacy.series(url.searchParams));
+          if (path === '/api/legacy/snapshots') return send(200, legacy.snapshots(url.searchParams.get('date')));
+          if (path.startsWith('/api/legacy/snapshot/')) return send(200, legacy.snapshot(path.slice(21)));
+          if (path === '/api/legacy/export.csv') {
+            const data = legacy.series(url.searchParams);
+            const lines = ['source_format,bucket_or_capture_utc,customers,outages,customer_peak_capture_utc,outage_peak_capture_utc,observations,grid_snapshots'];
+            for (const p of data.points) lines.push(['legacy_html', data.resolution === 'observations' && p.capturedAt ? p.capturedAt : new Date(p.at).toISOString(), p.customers ?? '', p.outages ?? '',
+              p.capturedAt ?? '', p.outageCapturedAt ?? p.capturedAt ?? '', p.observations ?? (p.id ? 1 : 0), p.gridSnapshots ?? (p.gridCaptureKey ? 1 : 0)].join(','));
+            res.setHeader('Content-Disposition', 'attachment; filename="mlgw-legacy-series.csv"');
+            return send(200, lines.join('\r\n') + '\r\n', 'text/csv; charset=utf-8');
+          }
+          if (path === '/api/legacy/export.geojson') {
+            const data = legacy.snapshot(url.searchParams.get('id'));
+            if (!data.detail.available) throw new RequestError(data.detail.reason, 409);
+            res.setHeader('Content-Disposition', `attachment; filename="mlgw-${data.summary.id}.geojson"`);
+            return send(200, { ...data.detail.geojson, source: data.source, capturedAt: data.detail.capturedAt,
+              totalCapturedAt: data.summary.capturedAt, captureKey: data.detail.captureKey, recovery: data.detail.recovery }, 'application/geo+json; charset=utf-8');
+          }
+        }
         if (path === '/api/weather' && weather) return send(200, weather.at(url.searchParams));
         if (path === '/api/weather/periods' && weather) return send(200, weather.periods(url.searchParams));
         if (path === '/api/weather/period' && weather) return send(200, weather.period(url.searchParams));
@@ -57,8 +95,8 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
       }
       const file = path === '/' ? '/index.html' : decodeURIComponent(path);
       // Serve the built client only; data, archives and collector operations are never routed.
-      if (!/^\/(index\.html|app\.(js|css)|assets\/[a-zA-Z0-9_.-]+)$/.test(file)) throw new RequestError('Not found.', 404);
-      const target = resolve(staticRoot, '.' + file), rel = relative(resolve(staticRoot), target);
+      if (!/^\/((index|legacy)\.html|(app|legacy)\.(js|css)|assets\/[a-zA-Z0-9_.-]+)$/.test(file)) throw new RequestError('Not found.', 404);
+      const target = resolve(staticRoot, file === '/legacy.html' && url.searchParams.get('view') === 'comparisons' ? 'comparisons.html' : '.' + file), rel = relative(resolve(staticRoot), target);
       if (rel.startsWith('..') || isAbsolute(rel)) throw new RequestError('Not found.', 404);
       const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.png': 'image/png', '.woff2': 'font/woff2' };
       let bytes;

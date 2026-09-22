@@ -13,8 +13,8 @@ function loginPage(invalid = false) {
   return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MLGW · Private preview</title><style>
   *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f4f5f0;color:#213f37;font:16px 'Segoe UI',sans-serif}main{width:100%;max-width:410px;padding:30px;background:#fcfdf9;border:1px solid #dce2d9;border-radius:12px}small{letter-spacing:1.5px;color:#68766e;font-size:10px;font-weight:700}h1{font-size:29px;letter-spacing:-1px;margin:14px 0}p{color:#68766e;font-size:14px;line-height:1.65}label{display:block;margin:24px 0 8px;font-size:13px;font-weight:600}input{font:inherit;padding:13px;width:100%;border:1px solid #bbc8b8;border-radius:6px}button{margin-top:16px;width:100%;padding:14px;border:0;border-radius:6px;background:#213f37;color:white;font:600 14px 'Segoe UI',sans-serif;cursor:pointer}input:focus,button:focus{outline:2px solid #be693e;outline-offset:3px}.error{color:#9b4028}.note{font-size:11px;margin-top:22px}</style></head>
   <body><main><small>MEMPHIS / PRIVATE PREVIEW</small><h1>Outage observatory.</h1><p>Enter the preview password from our chat to open the live dashboard.</p>
-  ${invalid ? '<p class="error" role="alert">That password did not match. Please try again.</p>' : ''}
-  <form action="/preview/login" method="post"><label for="password">Preview password</label><input id="password" name="password" type="password" autocomplete="current-password" required maxlength="256"><button type="submit">Open dashboard →</button></form>
+  ${invalid ? '<p class="error" role="alert">That password did not match this preview. Use the password sent with this link; each new preview has a new password.</p>' : ''}
+  <form action="/preview/login" method="post" accept-charset="UTF-8"><label for="password">Preview password</label><input id="password" name="password" type="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" aria-describedby="password-hint" required maxlength="256"><p id="password-hint">Passwords are case-sensitive. Extra spaces around a pasted password are ignored.</p><button type="submit">Open dashboard →</button></form>
   <p class="note">Temporary access. The dashboard runs on your PC; it must stay awake and connected.</p></main></body></html>`;
 }
 async function formBody(req) {
@@ -26,7 +26,7 @@ async function formBody(req) {
   }
   return new URLSearchParams(Buffer.concat(chunks).toString('utf8'));
 }
-const permitted = path => /^\/(?:|index\.html|app\.(?:js|css)|assets\/[a-zA-Z0-9_.-]+|api\/(?:config|health|latest|series|snapshots|weather|weather\/(?:periods|period)|weather\/image\/[a-f0-9]{64}|snapshot\/[a-zA-Z0-9_-]{1,120}|export\.(?:csv|geojson)))$/.test(path);
+const permitted = path => /^\/(?:|(?:index|legacy)\.html|(?:app|legacy)\.(?:js|css)|assets\/[a-zA-Z0-9_.-]+|api\/(?:config|health|latest|series|snapshots|weather|weather\/(?:periods|period)|weather\/image\/[a-f0-9]{64}|snapshot\/[a-zA-Z0-9_-]{1,120}|export\.(?:csv|geojson)|legacy\/(?:catalog|series|snapshots|snapshot\/legacy-[a-f0-9]{24}|export\.(?:csv|geojson))))$/.test(path);
 
 // Deliberately separate from the collector and local dashboard. Only this
 // loopback gateway is pointed at the temporary tunnel; all reads require a session.
@@ -62,8 +62,11 @@ export function createPreviewGateway({ passwordHash, getOrigin, expiresAt, upstr
         if (Number(req.headers['content-length'] ?? 0) > 1024) return send(413, 'Request too large.');
         if (now() - loginWindow >= 60000) { loginWindow = now(); loginAttempts = 0; }
         if (++loginAttempts > loginLimit) return send(429, 'Too many login attempts. Retry in one minute.', undefined, { 'Retry-After': '60' });
-        const password = (await formBody(req)).get('password') ?? '';
-        if (password.length > 256 || !timingSafeEqual(Buffer.from(passwordDigest(password), 'hex'), expected)) return send(401, loginPage(true), 'text/html; charset=utf-8');
+        const submitted = (await formBody(req)).get('password') ?? '';
+        // Generated preview passwords contain only base64url characters. Ignore
+        // surrounding copy/paste padding, retaining exact case and internal text.
+        const password = submitted.replace(/^[\s\u200B]+|[\s\u200B]+$/gu, '');
+        if (submitted.length > 256 || !timingSafeEqual(Buffer.from(passwordDigest(password), 'hex'), expected)) return send(401, loginPage(true), 'text/html; charset=utf-8');
         const token = randomBytes(32).toString('base64url');
         if (sessions.size >= 16) sessions.delete(sessions.keys().next().value);
         sessions.set(passwordDigest(token), expiresAt);
@@ -74,7 +77,7 @@ export function createPreviewGateway({ passwordHash, getOrigin, expiresAt, upstr
       const token = (req.headers.cookie ?? '').split(';').map(s => s.trim()).find(s => s.startsWith(COOKIE + '='))?.slice(COOKIE.length + 1);
       const authorized = typeof token === 'string' && /^[a-zA-Z0-9_-]{43}$/.test(token) && (sessions.get(passwordDigest(token)) ?? 0) > now();
       if (!authorized) {
-        if (url.pathname === '/' || url.pathname === '/index.html') return send(200, loginPage(), 'text/html; charset=utf-8');
+        if (['/', '/index.html', '/legacy.html'].includes(url.pathname)) return send(200, loginPage(), 'text/html; charset=utf-8');
         return send(401, '{"error":"Preview sign-in required. Reload the page to sign in."}', 'application/json; charset=utf-8');
       }
       if (!permitted(url.pathname)) return send(404, 'Not found.');

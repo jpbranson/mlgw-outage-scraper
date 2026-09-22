@@ -1,0 +1,17 @@
+[Unit]
+Description=Check MLGW freshness, collectors, and free space
+After=mlgw-dashboard.service
+ConditionPathExists=/var/lib/mlgw/collection-enabled
+
+[Service]
+Type=oneshot
+User=mlgw
+Group=mlgw
+WorkingDirectory=/opt/mlgw/current
+ExecStart=/opt/node/bin/node scripts/production-health.mjs
+TimeoutStartSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+MemoryMax=128M

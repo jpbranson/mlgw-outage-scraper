@@ -1,0 +1,27 @@
+[Unit]
+Description=MLGW public read-only dashboard
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=mlgw
+Group=mlgw
+WorkingDirectory=/opt/mlgw/current
+Environment=NODE_ENV=production
+Environment=MLGW_COLLECTOR_CONFIG=config/collector.production.json
+EnvironmentFile=/etc/mlgw/dashboard.env
+ExecStart=/opt/node/bin/node scripts/dashboard.mjs
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/mlgw/data/collector
+MemoryMax=768M
+
+[Install]
+WantedBy=multi-user.target

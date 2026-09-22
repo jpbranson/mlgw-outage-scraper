@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><title>MLGW weather comparisons</title>
+  <link rel="stylesheet" href="/legacy.css"><script type="module" src="/legacy.js"></script>
+</head>
+<body data-view="comparisons"><main>
+  <header class="page-header"><div><h1>MLGW outages</h1><p>Memphis &amp; Shelby County</p></div><p>Historical weather comparisons</p></header>
+  <nav class="source-navigation" aria-label="Outage source"><a href="/">Current feed</a><a href="/legacy.html">Legacy archive · 2022–2025</a><a href="/legacy.html?view=comparisons" aria-current="page">Weather comparisons</a></nav>
+  <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">Retry</button></div>
+  <section class="comparison-intro"><h2>Weather &amp; observed outages</h2><p>Selected 72-hour rain, wind, cold and heat case studies. Compare regional outage totals with prepared weather and matched reference periods. These observations show timing and co-occurrence; they do not establish causes.</p><p><a href="#matched-reference">Compare matched reference periods</a></p></section>
+  <div class="map-toolbar"><label>Case study <select id="episode" disabled></select></label><label>Additional weather lag <select id="lag"><option value="0">0 hours</option><option value="1">1 hour</option><option value="3">3 hours</option></select></label></div>
+  <p id="period" class="muted" role="status">Loading prepared comparisons…</p>
+  <div id="comparison-content" hidden>
+    <section class="comparison-stats" aria-label="Case study measures">
+      <div><span>Observed customer peak</span><strong id="peak">—</strong><small id="peak-time"></small></div>
+      <div><span>72-hour estimated rain</span><strong id="rain-total">—</strong><small>Area-weighted mean · Memphis-area rectangle</small></div>
+      <div><span>Highest reported sustained wind</span><strong id="wind-peak">—</strong><small>Memphis airport · supported passing QC</small></div>
+      <div><span>Customer-hours</span><strong id="burden">Unavailable</strong><small id="burden-coverage"></small></div>
+    </section>
+    <section class="panel comparison-timeline"><div class="panel-heading"><h2>Hourly timeline</h2><span class="muted">Actual UTC hours</span></div>
+      <p class="muted">Separate scales, aligned hours. Outage dots are observed hourly peaks; rainfall and wind are shown in their own observation hours. Missing values stay blank.</p>
+      <h3>Customers affected · hourly peak</h3><div class="comparison-chart"><canvas id="outage-chart" role="img" aria-label="Hourly observed customer peaks; exact values are in the hourly data table."></canvas></div>
+      <h3>Estimated rainfall · mm per hour</h3><div class="comparison-chart"><canvas id="rain-chart" role="img" aria-label="Hourly area-weighted rainfall in millimeters."></canvas></div>
+      <h3>Reported sustained wind · m/s</h3><div class="comparison-chart"><canvas id="wind-chart" role="img" aria-label="Hourly maximum accepted sustained wind reports in meters per second."></canvas></div>
+      <p id="hour-coverage" class="muted"></p>
+    </section>
+    <section class="panel comparison-section"><h2>Conditions before outage observations</h2><p id="lag-note"></p><p id="joint-coverage" class="muted"></p>
+      <div class="comparison-table-wrap"><table class="comparison-table"><caption>Descriptive groups · medians require at least six matched hours</caption><thead><tr><th scope="col">Weather condition</th><th scope="col">Weather hours</th><th scope="col">Hours with outage data</th><th scope="col">Median hourly customer peak</th></tr></thead><tbody id="groups"></tbody></table></div>
+      <p class="muted">Rain ≥0.1 mm and wind ≥10 m/s are analytical cutoffs. Groups overlap. Hours within a storm are not independent events; these are not estimates of weather effects.</p>
+    </section>
+    <section id="matched-reference" class="panel comparison-section" aria-labelledby="matched-heading">
+      <h2 id="matched-heading">Matched reference period</h2><p id="matched-range"></p><p id="matched-selection" class="muted"></p>
+      <p>Each side contributes one actual snapshot nearest the half hour, within 15 minutes. Paired capture times differ by at most 10 minutes. The medians below use the same hours on both sides; they differ from the hourly peaks above.</p>
+      <p id="matched-coverage" role="status"></p><p id="matched-weather" class="muted"></p>
+      <div class="comparison-table-wrap"><table class="comparison-table"><caption>Customers affected · medians of matched snapshots</caption><thead><tr><th scope="col">Case weather condition</th><th scope="col">Paired hours</th><th scope="col">Case median</th><th scope="col">Reference median</th></tr></thead><tbody id="matched-groups"></tbody></table></div>
+      <p id="matched-exclusions" class="muted"></p><p id="matched-carryover"></p>
+      <p class="muted">Reference weather must be below both thresholds: estimated regional rain &lt;0.1 mm and airport sustained wind &lt;10 m/s. Each exposure ends before its outcome hour; the selected additional lag applies to both periods. Low estimates do not prove dry weather everywhere. Six pairs are required for a median.</p>
+      <p class="muted">Hours within a storm are dependent. These descriptive contrasts do not control prior storms, maintenance, heat, demand or other differences, and do not estimate outage causes.</p>
+      <details><summary>Reference selection, paired observations and exclusions</summary><p>Candidate dates are screened using calendar, capture timestamps and station weather. Outage counts do not determine which dates or captures are selected.</p><ul id="matched-candidates"></ul>
+        <div class="chart-footer"><a id="matched-csv" class="export-link">Download reference pairs (CSV)</a></div>
+        <div class="comparison-table-wrap"><table class="comparison-table"><caption>All 72 candidate hour pairs · excluded observations remain visible</caption><thead><tr><th scope="col">Case capture UTC</th><th scope="col">Customers</th><th scope="col">Reference capture UTC</th><th scope="col">Customers</th><th scope="col">Pair status</th></tr></thead><tbody id="matched-pairs"></tbody></table></div>
+      </details>
+    </section>
+    <div class="comparison-two-column">
+      <section class="panel comparison-section"><h2>Preceding 72 hours</h2><p id="reference-range" class="muted"></p><p id="reference"></p><p id="carryover"></p><p class="muted">Descriptive context only. Rainfall has not been prepared for this preceding period, so it is not a matched dry-weather control.</p></section>
+      <section class="panel comparison-section"><h2>Geographic coverage</h2><p id="spatial"></p><p id="rain-area"></p><a id="rainfall-map" class="export-link">Open the verified 72-hour rainfall map</a><p class="muted">The rainfall map shows estimated weather only. Airport wind is a point observation, not a neighborhood wind surface.</p></section>
+    </div>
+    <section class="panel comparison-section"><h2>Archived weather context</h2><p id="event-scope" class="muted"></p><ul id="events"></ul><p id="warning-scope" class="muted"></p><ul id="warnings"></ul><p class="muted">County and forecast-zone labels are context, not damage footprints. No matching event record does not mean no severe weather occurred.</p></section>
+    <details class="panel comparison-section"><summary>Hourly values and downloads</summary><p>Each row is an outcome hour, paired with a completed earlier weather hour. Blank values mean unavailable. All timestamps are UTC.</p><div class="chart-footer"><a id="csv" class="export-link">Download case hourly CSV</a><a id="json" class="export-link" download="weather-comparison.json">Download data and sources (JSON)</a></div>
+      <div class="comparison-table-wrap"><table class="comparison-table"><caption>Observed peaks and selected weather pairing</caption><thead><tr><th scope="col">Outcome hour UTC</th><th scope="col">Captures</th><th scope="col">Customer peak</th><th scope="col">Reported outages peak</th><th scope="col">Weather hour ends UTC</th><th scope="col">Rain mm</th><th scope="col">Wind m/s</th></tr></thead><tbody id="hourly"></tbody></table></div>
+    </details>
+    <details class="panel comparison-section"><summary>Sources, coverage and interpretation</summary><p id="outage-note"></p><p id="rain-note"></p><p id="wind-note"></p><ul id="interpretation"></ul><p id="context-note"></p><p id="provenance" class="comparison-hash"></p></details>
+  </div>
+  <footer><span>Independent local archive · legacy_html</span><a href="/legacy.html">Browse original outage observations</a></footer>
+</main></body></html>

@@ -26,9 +26,27 @@ const iem = 'https://mesonet.agron.iastate.edu';
 const ncei = 'https://www.ncei.noaa.gov';
 const aws = 'https://noaa-mrms-pds.s3.amazonaws.com';
 const qpe = 'MultiSensor_QPE_01H_Pass2';
+// Explicit revisions observed in NOAA's directory on September 18, 2026 UTC.
+// A changed release requires a new request identity; old bodies remain replayable.
+export const STORM_EVENT_RELEASES = Object.freeze({ 2022:'20260625', 2023:'20260323', 2024:'20260728', 2026:'20260910' });
 export function sourceRequest(product, at) {
   const ms = instant(at), iso = new Date(ms).toISOString(), stamp = iso.slice(0,16).replace(/[-:T]/g,''), date = stamp.slice(0,8);
   const base = { product, validAt: iso, processingVersion: PROCESSING_VERSION };
+  if (product === 'storm-events') {
+    const year=Number(iso.slice(0,4)),revision=STORM_EVENT_RELEASES[year];
+    if(!revision)throw Error('Storm Events year has no pinned release');
+    const filename=`StormEvents_details-ftp_v1.0_d${year}_c${revision}.csv.gz`;
+    return {...base,validAt:null,year,revision,provider:'NOAA NCEI',productVersion:'Storm Events details v1.0',kind:'csv.gz',
+      url:`${ncei}/pub/data/swdi/stormevents/csvfiles/${filename}`,
+      qualityFlags:['retrospective-published-events-subject-to-revision','county-or-zone-not-damage-footprint','missing-record-not-no-hazard']};
+  }
+  if (product === 'zone-warnings') {
+    if(ms%60000)throw Error('Warning snapshot requires a whole UTC minute');
+    const params=new URLSearchParams({accept:'csv',timeopt:'2',at:iso,location_group:'wfo',wfo:'MEG',limit0:'false',limit1:'false',simple:'false'});
+    return {...base,provider:'NWS via Iowa Environmental Mesonet',productVersion:'VTEC county/zone archive snapshot MEG',kind:'csv',
+      url:`${iem}/cgi-bin/request/gis/watchwarn.py?${params}`,
+      qualityFlags:['warned-area-not-confirmed-damage','retrospective-final-status-not-issuance-time-replay','exact-time-not-period-warning-coverage']};
+  }
   if (product === 'radar' || product === 'radar-world') {
     if (ms % 300000) throw Error('Radar requires an exact five-minute timestamp');
     const ext = product === 'radar' ? 'png' : 'wld';
@@ -65,6 +83,18 @@ export function sourceRequest(product, at) {
 }
 // A caller cannot turn the cache into an arbitrary URL downloader.
 export function validateRequest(request) {
-  const expected=sourceRequest(request.product, request.product === 'station' ? `${request.year}-01-01T00:00:00Z` : request.validAt);
+  const expected=request.product==='warning-geometry'?warningGeometryRequest(request.event):sourceRequest(request.product,
+    ['station','storm-events'].includes(request.product) ? `${request.year}-01-01T00:00:00Z` : request.validAt);
   if (JSON.stringify(expected) !== JSON.stringify(request)) throw Error('Weather source request does not match the allowlist');
+}
+export function warningGeometryRequest(event) {
+  const {year,phenomena,significance,eventid}=event;
+  if(!Number.isInteger(year)||!STORM_EVENT_RELEASES[year]||!(/^[A-Z]{2}$/.test(phenomena))
+    ||!['W','A','Y','S','F','O','N'].includes(significance)||!Number.isInteger(eventid)||eventid<1||eventid>9999)throw Error('Invalid warning event identity');
+  const canonical={year,phenomena,significance,eventid};
+  const params=new URLSearchParams({wfo:'MEG',year:String(year),phenomena,significance,etn:String(eventid)});
+  return {product:'warning-geometry',validAt:null,event:canonical,processingVersion:PROCESSING_VERSION,
+    provider:'NWS via Iowa Environmental Mesonet',productVersion:'VTEC county/zone event geometry MEG',kind:'geojson',crs:'EPSG:4326',
+    url:`${iem}/geojson/vtec_event.py?${params}`,
+    qualityFlags:['administrative-warning-area-not-damage-footprint','event-archive-may-include-later-updates']};
 }

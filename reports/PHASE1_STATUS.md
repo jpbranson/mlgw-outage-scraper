@@ -1,10 +1,12 @@
 # Phase 1 checkpoint: source contract and free-hosting feasibility
 
-Source/feasibility checkpoint recorded September 16, 2026; documentation reconciled September 17. **The full Phase 1 exit gate has not passed.** Measurements below describe the dated source checkpoint. See [current project status](PROJECT_STATUS.md) for the latest trial and deployment checks. The 24-hour pilot was still running at the September 17 audit; temporary Quick Tunnel access is now deployed, while production cloud resources and provider-runtime validation remain deferred.
+**September 22 deployment update:** the [DigitalOcean deployment guide](DIGITALOCEAN_DEPLOYMENT.md) is authoritative for current operation. The VM now serves the dashboard and runs both collectors; local collectors are stopped. Runtime counts, preview sessions, trial deadlines and hosting gates below describe this earlier checkpoint. Its scientific findings and dated validation results are preserved.
 
-**Validation scope, confirmed by the user September 16:** continue the public-feed observation pilot, local parser/replay tests, storm benchmarks and storage modeling. Permanent cloud account setup/deployment and provider-runtime tests remain deferred. The separately requested temporary Quick Tunnel does not establish provider CPU/storage feasibility. The next source-pilot check-in should report local results and deferred cloud evidence without requesting an account connection again.
+Source/feasibility checkpoint recorded September 16, 2026; the scheduled local review completed September 17 at approximately 12:20 PM CDT. **The 24-hour local observation gate passed; the full Phase 1 exit gate has not passed.** The source pilot completed, and the seven-day collector continues. Production cloud resources and provider-runtime validation remain pending account setup. See [current project status](PROJECT_STATUS.md) for the latest preview session and [subsequent local development](DEVELOPMENT_COMPLETION_STATUS.md), including the acceptance command and transfer rehearsal. Original benchmark tables and local findings below retain their measurement dates.
 
-The user's subsequent request to proceed with the next step authorized local Phase 2 implementation while this pilot continues. See [PHASE2_STATUS.md](PHASE2_STATUS.md). This does not change the cloud deferral or mark Phase 1 accepted.
+**Validation scope, confirmed by the user September 16:** the public-feed observation pilot, local parser/replay tests, storm benchmarks and storage modeling were authorized and completed locally. Permanent cloud account setup/deployment and provider-runtime tests remain deferred. The separately requested temporary Quick Tunnel did not establish provider CPU/storage feasibility. The completed source review below reports the local results and remaining cloud evidence.
+
+The user's subsequent request authorized local Phase 2 implementation while the pilot was running. The pilot has now completed and handed off to the seven-day collector; see [PHASE2_STATUS.md](PHASE2_STATUS.md). This does not change the cloud deferral or mark the full Phase 1 gate accepted.
 
 ## Work completed
 
@@ -40,9 +42,62 @@ Reviewed the public [map description](https://www.mlgw.com/outagemap/), [live ma
 
 ## Pilot and follow-up
 
-The pilot started **September 16 at 11:37:51 AM Central** and is scheduled to take its last observation on/after **September 17 at 11:37:51 AM**, normally the 11:40 slot. Its first capture succeeded with matching feed/HTML totals and no validation flags. It runs on this PC, so sleep/shutdown or network loss can leave gaps. Power settings have not been changed. Raw evidence and state are under `data/pilot/`; run `npm run analyze` for current coverage.
+The pilot started **September 16 at 11:37:51 AM CDT** and completed with its final observation at **September 17 at 11:40 AM CDT**, after the planned 24-hour boundary. Its first capture succeeded with matching feed/HTML totals and no validation flags. It ran on this PC without power-setting changes; the separate collector still depends on the PC staying awake and connected. Completed pilot evidence and state remain under `data/pilot/`; `npm run analyze` rechecks that preserved window.
 
-A one-time review in the existing Codex thread is scheduled for **September 17 at 12:15 PM CDT** (automation `review-mlgw-phase-1-pilot`, configuration verified active September 17). The computer and Codex app must be running for that local review. See [the scheduled-task documentation](https://learn.chatgpt.com/docs/automations?surface=app). Its current instructions review the Phase 1 observations, local Phase 2 trial and already implemented Phase 3 dashboard, then check back without starting Phase 4 or deploying additional resources.
+The one-time **September 17 at 12:15 PM CDT** review (`review-mlgw-phase-1-pilot`) ran and produced the findings below. It reviewed the saved source observations, Phase 2 handoff and local dashboard without starting another implementation stage. The existing automation has one occurrence; no further review was scheduled here.
+
+## Completed 24-hour local review — September 17
+
+**Requested revalidation at 22:00 UTC:** the completed pilot again passed with 290/290 valid observations, no failures, no parser quality issues and all HTML totals matching. All 290 pilot originals/normalized results were verified again; the combined archive now had 354/354 captures replayed and restored successfully in an isolated database. The earlier scheduled-review figures below retain their original cutoff. See [storage and pilot revalidation](STORAGE_AND_PILOT_STATUS.md) for the new evidence.
+
+`npm run analyze` ran at **17:15:49 UTC / 12:15:49 PM CDT**. The pilot stopped after its final capture at **16:40:00.203 UTC / 11:40 AM CDT**, with `completedAt` recorded at 16:40:00.293 UTC. The observation span began September 16 at 16:37:51.973 UTC: **24 hours, 2 minutes, 8.230 seconds**. There are 290 slots rather than 288 because the initial observation was partway through a five-minute slot and the final observation was at/after the 24-hour boundary.
+
+| Check | Measured result |
+| --- | --- |
+| Valid observations / expected slots in observed span | **290 / 290 (100%)**, with no recorded failures or parser quality issues |
+| Observation spacing | Mean 299.406 seconds; p95 300.036 seconds; maximum 301.014 seconds; no gap over ten minutes |
+| Adjacent feed comparisons | 197 meaningful changes, 86 byte-only changes excluded by the meaningful-state definition, six unchanged pairs |
+| HTML consistency | **290 / 290 affected-customer totals match**; feed/HTML receipt times were at most 156 ms apart |
+| Affected customers | Median 106, p95 814, maximum **6,256** at September 16 19:15 UTC / 2:15 PM CDT, with 21 reported outages in that capture |
+| Reported outage features | Median 8, p95 15, maximum **112**; this is a separate peak from the customer maximum |
+| Empty observations | Two valid zero captures, September 17 11:45 and 11:50 UTC, both supported by HTML zero |
+| Source IDs | 307 distinct IDs; no observed disappearance/reappearance of an ID during this pilot |
+
+Five-minute polling captured meaningful changes in about 68% of adjacent pairs. This supports retaining the provisional cadence, but does not establish the source's publication interval or recover events entirely between polls. HTML equality is a consistency check between non-atomic requests, not proof of completeness on the electrical network.
+
+**Identity is not stable in every field.** Eight existing IDs received earlier start times together at September 17 06:10 UTC / 1:10 AM CDT; changes ranged from 10 to 295 seconds. There were also 30 coordinate edits across 27 IDs, with observed displacement about 19 m to 1.58 km. Overall, 34 IDs had a changed start or location. Preserve those edits as source evidence: provisional ID/start pairs can split one continuing report, and movement does not prove a new outage or affected service area. All 2,509 repeated feature observations parsed under the explicit Central-time assumption, with no future start times, but this one-day September sample does not validate winter/DST behavior or prove the timezone contract. The earlier offline DST tests remain relevant.
+
+### Archive replay and collector handoff
+
+At the fixed **17:15:01.965 UTC** capture cutoff, all **290 pilot records were present in the durable archive**, followed by seven direct collector captures. The first direct capture arrived at **16:45:01.288 UTC**, 301.085 seconds after the last pilot capture. There were **297 valid snapshots / 297 expected slots**, no duplicate slots and no gap over ten minutes. The collector kept its original September 16–23 window; see [Phase 2](PHASE2_STATUS.md).
+
+Local verification checked the manifest/parser hashes and decompressed feed/HTML checksums for all 297 indexed captures. Each pilot original and saved normalized result matched its durable replay byte-for-byte or structurally, respectively. A new temporary database reconstructed all **297 snapshots**, matched their timestamps, quality and totals, and drained all rollup work. Repeating recovery returned **297 already indexed records** without duplicating them. The live index/history were not rebuilt or modified by that restore. This is local archive evidence, not a provider-runtime test.
+
+### Observed storage and revised model
+
+All values below use decimal MB/GB. Per-capture feed measurements over the completed pilot:
+
+| Payload | Mean | p95 | Maximum |
+| --- | ---: | ---: | ---: |
+| Original GeoJSON | 3,071 bytes | 5,520 bytes | 36,201 bytes |
+| Gzipped GeoJSON | 669 bytes | 943 bytes | 2,892 bytes |
+| Gzipped GeoJSON + normalized result + provisional 4,096-byte metadata allowance | 5,545 bytes | 6,183 bytes | 10,371 bytes |
+| Gzipped HTML evidence, separately | 5,428 bytes | 5,429 bytes | 5,431 bytes |
+
+At **17:19:54 UTC**, the completed pilot directory occupied **9.386 MB**, and the collector occupied **7.200 MB**: **16.586 MB combined**, including diagnostics and SQLite journals. The collector's canonical objects were 1.807 MB (0.195 MB feed, 1.612 MB HTML); manifests used 0.611 MB, the main SQLite file 0.356 MB, and its live WAL 4.169 MB. Weather, benchmarks/fixtures, reports, builds and runtime tools are excluded. C: had about **240.2 GB free**. Startup/journal overhead means this directory total is not a measured ongoing daily growth rate.
+
+At the pilot's average payload and five-minute cadence, gzip feed bodies alone project to **0.193 MB/day / 70.3 MB/year**; adding the provisional 4,096-byte metadata allowance gives **1.372 MB/day / 0.501 GB/year**, before HTML, storm reserves, caches, staging and weather. These extrapolations describe this sample, not an annual storm forecast.
+
+Replacing the earlier single ordinary fixture with the measured mean yields these revised compressed-original scenarios. They retain seven synthetic storm days in the protected year, 30 storm days offline, seven days each of transfer staging and cleanup grace, 48 storm hours of normalized cache, 24 storm hours of raw staging, and 50 MB for parser artifacts:
+
+| Synthetic storm size | Revised feed/metadata/cache/staging model | Including retained HTML and its raw staging |
+| --- | ---: | ---: |
+| 4,000 features | 2.546 GB | **3.191 GB** |
+| 10,000 features | 5.443 GB | **6.088 GB** |
+
+**The earlier model omitted retained HTML evidence.** The added allowance uses its observed 5,428-byte compressed mean for all 409 modeled days, plus 24 hours of uncompressed HTML staging (about 5.64 MB). The 4,096-byte metadata allowance does not cover that HTML. Storm HTML sizes, cloud index growth and actual account capacity remain unverified; weather is separate. This supersedes treating the earlier 2.58/5.47 GB estimates as a complete archive budget. No paid service, retention policy, cadence or runtime was changed.
+
+Evidence: ignored `reports/pilot-summary.json` and `reports/phase1-local-checkpoint.json`; the latter records the fixed cutoff, source-field edits, storage calculations, restore directory and dashboard API checks. The local audit helper is retained at ignored `data/phase1-local-checkpoint.mjs`; running it again creates a new temporary restore and overwrites the JSON with a new cutoff. The September 16 ordinary/4,000/10,000-feature benchmark and byte-exact synthetic replay files were inspected, not relabeled as new measurements.
 
 ## Measured payloads and local processing
 
@@ -93,9 +148,7 @@ Selected local pilot/evidence location: `C:\Developer\mlgw-outage-scraper\data`.
 
 ## Remaining local validation
 
-1. Finish at least 24 hours of observations at five-minute resolution; evaluate actual gaps, meaningful changes, ID behavior, timezone consistency and HTML discrepancies.
-2. Replace quiet-day assumptions with pilot size distributions, check local replay and refine the storage/headroom estimate.
-3. Report local findings, remaining source uncertainty and provisional runtime/cadence choices alongside the ongoing local Phase 2 trial. The dashboard and weather checkpoints have since been implemented under subsequent requests; this source review does not itself authorize another implementation phase or permanent cloud deployment.
+The scheduled 24-hour review, observed-distribution storage update and real-archive replay are complete. Continue the already running seven-day trial and assess longer-run coverage, storage growth and source-field edits. Retain uncertainty around publication cadence, ID/start corrections, approximate coordinates, timezone guarantees and large-storm completeness. The dashboard and weather checkpoints were implemented under separate requests; this review starts no additional implementation phase.
 
 ## Deferred cloud gates
 

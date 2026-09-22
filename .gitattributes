@@ -1,0 +1,5 @@
+# Preserve Unix line endings for Linux deployment files on Windows.
+deploy/digitalocean/*.sh text eol=lf
+deploy/digitalocean/*.service text eol=lf
+deploy/digitalocean/*.timer text eol=lf
+deploy/digitalocean/*.yaml text eol=lf

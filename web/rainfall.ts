@@ -33,10 +33,11 @@ export class RainfallControls {
     }catch(error){if(ticket===this.ticket&&this.active){put('rainfall-status',(error as Error).message);this.onRange(null);}}
   }
   private options() {
-    const hours=Number(el<HTMLSelectElement>('rainfall-hours').value),select=el<HTMLSelectElement>('rainfall-ending'),prior=select.value;
+    const hours=Number(el<HTMLSelectElement>('rainfall-hours').value),select=el<HTMLSelectElement>('rainfall-ending'),priorTo=this.periods.find(p=>p.id===select.value)?.to;
     select.replaceChildren();
     for(const range of this.periods.filter(p=>p.hours===hours)){const option=document.createElement('option');option.value=range.id;option.textContent=date(range.to);select.append(option);}
-    if([...select.options].some(o=>o.value===prior))select.value=prior;
+    const matching=this.periods.find(p=>p.hours===hours&&p.to===priorTo);
+    if(matching)select.value=matching.id;
     select.disabled=!select.options.length;
   }
   private async load() {
