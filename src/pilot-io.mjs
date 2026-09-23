@@ -1,16 +1,15 @@
-import { mkdir, writeFile, readdir, readFile, rename } from 'node:fs/promises';
+import { mkdir, writeFile, readdir, readFile } from 'node:fs/promises';
 import { createHash, randomUUID } from 'node:crypto';
 import { gzipSync } from 'node:zlib';
 import { FEED_URL, MAP_URL, parseFeed, meaningfulState, parseHtmlSummary } from './contract.mjs';
+import { writeAtomic } from './runtime/durable-files.mjs';
 
 export const DATA_DIR = new URL('../data/pilot/', import.meta.url);
 export const sha256 = body => createHash('sha256').update(body).digest('hex');
 export const gzipBytes = body => gzipSync(body, { level: 6 }).byteLength;
 export const writeJson = (path, value, options) => writeFile(path, JSON.stringify(value, null, 2) + '\n', options);
 export async function writeJsonAtomic(path, value) {
-  const temp = new URL(`${path.pathname.split('/').at(-1)}.${randomUUID()}.tmp`, path);
-  await writeJson(temp, value);
-  await rename(temp, path);
+  writeAtomic(path, JSON.stringify(value, null, 2) + '\n');
 }
 
 export function retryAfterMs(value, now = Date.now()) {
@@ -41,28 +40,34 @@ export async function fetchBounded(url, { fetchImpl = fetch, maxBytes = 10 * 102
         if (bytes > maxBytes) throw new Error(`Response exceeds ${maxBytes} decoded bytes`);
         chunks.push(value);
       }
-    } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      error.response = { url, requestedAt, receivedAt: new Date().toISOString(), status: response.status,
+        headers: selectedHeaders, latencyMs: performance.now() - start, bytes, bodyComplete: false };
+      throw error;
+    }
     finally { reader.releaseLock(); }
   }
   return { body: Buffer.concat(chunks), url, requestedAt, receivedAt: new Date().toISOString(),
     status: response.status, headers: selectedHeaders, latencyMs: performance.now() - start, bytes };
 }
 
-export async function capture(slot, { dir = DATA_DIR, fetchImpl = fetch } = {}) {
+export async function capture(slot, { dir = DATA_DIR, fetchImpl = fetch, diagnostics = true } = {}) {
   await mkdir(dir, { recursive: true });
-  const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + crypto.randomUUID().slice(0, 8);
+  const id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID().slice(0, 8);
   const record = { id, scheduledAt: new Date(slot).toISOString(), observedAt: new Date().toISOString(), status: 'failed', totals: null };
   for (const [name, url] of [['feed', FEED_URL], ['html', MAP_URL]]) {
     try {
       const { body, ...meta } = await fetchBounded(url, { fetchImpl });
       const filename = `${id}.${name === 'feed' ? 'geojson' : 'html'}`;
-      await writeFile(new URL(filename, dir), body, { flag: 'wx' });
+      await writeFile(new URL(filename, dir), body, { flag: 'wx', flush: true });
       record[name] = { ...meta, file: filename, sha256: sha256(body), gzipBytes: gzipBytes(body) };
       if (meta.status === 401 || meta.status === 403) { record.stopReason = `Source access restricted (${meta.status})`; break; }
       if (meta.status === 429) {
         record.retryAt = new Date(Date.now() + Math.max(300000, retryAfterMs(meta.headers['retry-after']))).toISOString(); break;
       }
       if (meta.status !== 200) { record[name].error = `HTTP ${meta.status}`; continue; }
+      if (!diagnostics) { if (name === 'feed') record.status = 'captured'; continue; }
       if (name === 'feed') {
         const parsed = parseFeed(body.toString('utf8'));
         const normalized = Buffer.from(JSON.stringify(parsed.normalized));
@@ -73,13 +78,19 @@ export async function capture(slot, { dir = DATA_DIR, fetchImpl = fetch } = {}) 
         record.status = parsed.totalsValid ? (parsed.issues.length ? 'review' : 'valid') : 'invalid';
         await writeJson(new URL(`${id}.normalized.json`, dir), parsed, { flag: 'wx' });
       } else record.htmlSummary = parseHtmlSummary(body.toString('utf8'));
-    } catch (error) { record[name] = { ...record[name], error: error.message }; }
+    } catch (error) {
+      record[name] = { ...error.response, ...record[name], error: error.message };
+      if ([401, 403].includes(record[name].status)) { record.stopReason = `Source access restricted (${record[name].status})`; break; }
+      if (record[name].status === 429) {
+        record.retryAt = new Date(Date.now() + Math.max(300000, retryAfterMs(record[name].headers?.['retry-after']))).toISOString(); break;
+      }
+    }
   }
   if (record.totals?.customers != null && record.htmlSummary?.customers != null) {
     record.comparison = { customersDelta: record.totals.customers - record.htmlSummary.customers,
       retrievalSeparationMs: Date.parse(record.html.receivedAt) - Date.parse(record.feed.receivedAt) };
   }
-  await writeJson(new URL(`${id}.attempt.json`, dir), record, { flag: 'wx' });
+  await writeJsonAtomic(new URL(`${id}.attempt.json`, dir), record);
   return record;
 }
 

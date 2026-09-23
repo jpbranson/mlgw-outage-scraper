@@ -20,6 +20,7 @@ try {
   while (!stopped && !state.stopReason && !existsSync(join(stateRoot, 'stop'))) {
     if (Date.now() >= (Date.parse(state.nextDueAt ?? '') || 0)) {
       let cache;
+      state.phase = 'refreshing'; state.runStartedAt = new Date().toISOString(); await persist();
       try {
         const evidenceBytes = directoryBytes(join(root, 'cache'));
         const totalCap = JSON.parse(readFileSync('config/weather.local.json')).cacheBytes;
@@ -35,7 +36,7 @@ try {
         state.status = outcomes.some(o => ['failed', 'restricted', 'provider-paused', 'rate-limited'].includes(o.status)) ? 'degraded' : 'ok';
         if (outcomes.some(o => o.status === 'restricted')) state.stopReason = 'source_restricted';
       } catch (error) { state.lastError = error.message; state.status = 'degraded'; }
-      finally { cache?.close(); }
+      finally { cache?.close(); state.phase = 'idle'; }
       state.nextDueAt = new Date(Date.now() + 30 * 60000).toISOString();
       await persist(); console.log(JSON.stringify(state));
     }

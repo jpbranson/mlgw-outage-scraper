@@ -1,5 +1,7 @@
 # MLGW outage collection
 
+**Technical audit implementation:** deterministic archive recovery, schema-2 rebuilds, durable publication, isolated request quotas, clearer data-quality warnings, Linux deployment rollback, CI/browser checks and daily verified PC backups are described in [the implementation record](reports/TECHNICAL_AUDIT_IMPLEMENTATION.md). Cloud monitoring is prepared but remains unconfigured by choice. Current operational results and recovery commands are in [the deployment runbook](reports/DIGITALOCEAN_DEPLOYMENT.md).
+
 **September 22 cloud deployment:** the dashboard is live at **https://64.225.60.118** on the selected $12/month DigitalOcean VM. Five-minute outage collection and 30-minute rolling weather refresh now run under Linux services. The local collectors are stopped after a verified handoff of all 1,722 archived attempts, saved weather evidence, legacy history and four comparison cases. The PC can be offline while cloud collection continues. See [deployment, SSH, health checks and backup instructions](reports/DIGITALOCEAN_DEPLOYMENT.md).
 
 Use `npm.cmd run deploy:verify` to check public access and `npm.cmd run deploy:backup` to download a verified cloud backup. Local `collector:status` and `weather:status` commands describe the stopped PC runners. Do not start a second local collector while cloud collection is active. The local trial ended by cloud handoff; it is not recorded as passing its original seven-day acceptance gate.

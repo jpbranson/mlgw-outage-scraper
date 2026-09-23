@@ -6,10 +6,11 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { LocalCollector } from '../src/durable/collector.mjs';
 import { productionStep, recoverProduction } from '../src/durable/production.mjs';
 import { capture, writeJsonAtomic } from '../src/pilot-io.mjs';
+import { validateCollectorConfig } from '../src/durable/config.mjs';
 
 if (process.env.MLGW_DEPLOYMENT !== 'production') throw Error('Set MLGW_DEPLOYMENT=production only on the intended cloud host');
 const config = JSON.parse(readFileSync(process.env.MLGW_COLLECTOR_CONFIG ?? 'config/collector.production.json', 'utf8'));
-if (config.mode !== 'production' || config.pollIntervalMs !== 300000 || config.automaticDeletion !== false) throw Error('Unsupported production configuration');
+validateCollectorConfig(config, 'production');
 const root = resolve(config.root); config.staging = join(root, 'staging'); mkdirSync(config.staging, { recursive: true });
 const statePath = join(root, 'production-state.json'), stopPath = join(root, 'production.stop');
 const state = existsSync(statePath) ? JSON.parse(readFileSync(statePath)) : { startedAt: new Date().toISOString(), mode: 'production' };
@@ -35,7 +36,7 @@ try {
         recovered = true;
       }
       const result = await productionStep({ collector, config, state, owner, persist,
-        capture: slot => capture(slot, { dir: pathToFileURL(config.staging + '/') }) });
+        capture: slot => capture(slot, { dir: pathToFileURL(config.staging + '/'), diagnostics: false }) });
       // Includes failed/transient attempts, all of which are retained in the archive.
       await recoverProduction(collector, config.staging, owner, Date.now, { scanArchive: false });
       await persist();

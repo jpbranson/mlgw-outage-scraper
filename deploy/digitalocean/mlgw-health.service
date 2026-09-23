@@ -8,6 +8,7 @@ Type=oneshot
 User=mlgw
 Group=mlgw
 WorkingDirectory=/opt/mlgw/current
+EnvironmentFile=-/etc/mlgw/monitoring.env
 ExecStart=/opt/node/bin/node scripts/production-health.mjs
 TimeoutStartSec=30
 NoNewPrivileges=true

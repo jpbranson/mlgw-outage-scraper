@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { LEGACY_VERSION, verifiedBytes } from './legacy-publish.mjs';
 import { RequestError, DAY } from './service.mjs';
+import { logError } from '../runtime/logging.mjs';
 
 const HOUR = 3600000;
 const SELECT = `SELECT o.id,o.at,o.observed_at AS capturedAt,o.customers,o.outages,g.capture_key AS gridCaptureKey
@@ -36,7 +37,8 @@ export class LegacyService {
       this.db = new DatabaseSync(join(root, catalog.index.path), { readOnly: true });
       this.metadata = JSON.parse(this.db.prepare('SELECT json FROM metadata').get().json);
       if (this.metadata.version !== LEGACY_VERSION || this.metadata.generation !== catalog.generation) throw new Error('Generation mismatch');
-    } catch {
+    } catch (error) {
+      logError('legacy.open', error);
       this.close(); this.db = null;
     }
   }

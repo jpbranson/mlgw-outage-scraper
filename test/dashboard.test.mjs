@@ -142,10 +142,11 @@ test('bounded exports retain selected times/counts and exclude private archive f
   assert.equal(geo.capturedAt, '2026-09-15T10:00:00.000Z'); assert.equal(geo.features[0].properties.customers, 10);
   assert.doesNotMatch(JSON.stringify(geo), /OUT_CAUSE|THIS MUST STAY PRIVATE|archive/);
 });
-test('local request budget responds with retry guidance', async t => {
+test('local data request budget responds with retry guidance while health stays available', async t => {
   const { service, dir } = setup(t); const url = await serve(t, service, dir, { requestLimit: 2 });
-  await fetch(`${url}/api/health`); await fetch(`${url}/api/health`);
-  const response = await fetch(`${url}/api/health`); assert.equal(response.status, 429); assert.equal(response.headers.get('retry-after'), '60');
+  await fetch(`${url}/api/config`); await fetch(`${url}/api/config`);
+  const response = await fetch(`${url}/api/config`); assert.equal(response.status, 429); assert.ok(Number(response.headers.get('retry-after')) > 0);
+  assert.equal((await fetch(`${url}/api/health`)).status, 200);
 });
 test('historical map replays verified originals, deduplicates polls and respects missing evidence', async t => {
   const { add, collector, service } = setup(t); add('a', 0, 10); add('b', 5, 20); add('c', 10, 5);
@@ -156,6 +157,7 @@ test('historical map replays verified originals, deduplicates polls and respects
   assert.doesNotMatch(JSON.stringify(result), /OUT_CAUSE|THIS MUST STAY PRIVATE|raw_key|manifest_key/);
   const first = collector.archive.readManifest('manifests/a.json').manifest;
   unlinkSync(collector.archive.path(first.bodies.feed.key));
+  service.spatialCache.clear(); // External corruption is discovered after the bounded cache expires.
   const partial = await service.spatial(params());
   assert.equal(partial.verifiedCaptures, 2); assert.equal(partial.unavailableCaptures, 1);
   assert.equal(partial.coverage, 5 / 60); assert.equal(partial.firstVerifiedAt, base + 5 * 60000);
@@ -169,6 +171,7 @@ test('historical map route uses the same bounded read-only API and rejects inval
   assert.equal((await fetch(`${url}/api/series?${query}`, { method: 'POST' })).status, 405);
   await assert.rejects(service.spatial(params(base - 32 * DAY, base)), /31 days/);
   await assert.rejects(service.spatial(new URLSearchParams('from=garbage')), /ISO/);
+  service.spatialCache.clear();
   const replay = service.spatial(params());
   await assert.rejects(service.spatial(params()), error => error.status === 429);
   await replay;

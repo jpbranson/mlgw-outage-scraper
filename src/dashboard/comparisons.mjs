@@ -3,6 +3,7 @@ import { join, resolve } from 'node:path';
 import { sha256 } from '../weather/objects.mjs';
 import { COMPARISON_VERSION } from '../weather/comparisons.mjs';
 import { RequestError } from './service.mjs';
+import { logError } from '../runtime/logging.mjs';
 
 export class ComparisonService {
   constructor(root){this.root=resolve(root);}
@@ -20,7 +21,7 @@ export class ComparisonService {
       if(c.version!==COMPARISON_VERSION||!Array.isArray(c.entries)||c.entries.length>10||new Set(c.entries.map(e=>e.id)).size!==c.entries.length)throw Error('Catalog version');
       for(const e of c.entries)if(!/^[a-z0-9-]{1,40}$/.test(e.id)||!/^[a-f0-9]{64}$/.test(e.sha256)||e.path!==e.sha256+'.json'||e.bytes>12*1024*1024)throw Error('Catalog entry');
       return c;
-    }catch{throw new RequestError('Prepared weather comparisons unavailable. Run npm run weather:comparisons.',503);}
+    }catch(error){logError('comparisons.catalog',error);throw new RequestError('Prepared weather comparisons unavailable.',503);}
   }
   series(params) {
     if([...params.keys()].some(k=>!['view','id','lag','table'].includes(k))||params.getAll('id').length!==1||params.getAll('lag').length>1||params.getAll('view').length>1||params.getAll('table').length>1||!['case','reference'].includes(params.get('table')??'case')||!['0','1','3'].includes(params.get('lag')??'0'))throw new RequestError('Choose one prepared comparison, a case/reference table and a lag of 0, 1 or 3 hours.');
@@ -30,7 +31,7 @@ export class ComparisonService {
       const path=join(this.root,...(e.kind==='temperature'?['conditions']:[]),e.path);if(statSync(path).size!==e.bytes)throw Error('Size');
       const bytes=readFileSync(path);if(sha256(bytes)!==e.sha256)throw Error('Checksum');
       d=JSON.parse(bytes);if(d.version!==COMPARISON_VERSION||d.id!==e.id||d.from!==e.from||d.to!==e.to||(e.kind==='temperature'&&(d.kind!=='temperature'||d.analysisVersion!=='temperature-comparison-v1')))throw Error('Identity');
-    }catch{throw new RequestError('Prepared comparison could not be verified.',503);}
+    }catch(error){logError('comparisons.read',error,{id:e.id});throw new RequestError('Prepared comparison could not be verified.',503);}
     const lag=Number(params.get('lag')??0);
     return {...d,byLag:undefined,comparison:d.byLag.find(l=>l.lagHours===lag),
       matchedReference:d.matchedReference?{...d.matchedReference,byLag:undefined,comparison:d.matchedReference.byLag.find(l=>l.lagHours===lag)}:undefined,publicationSha256:e.sha256};

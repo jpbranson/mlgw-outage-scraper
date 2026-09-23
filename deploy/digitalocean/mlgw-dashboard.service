@@ -10,6 +10,7 @@ Group=mlgw
 WorkingDirectory=/opt/mlgw/current
 Environment=NODE_ENV=production
 Environment=MLGW_COLLECTOR_CONFIG=config/collector.production.json
+Environment=DASHBOARD_TRUST_PROXY=1
 EnvironmentFile=/etc/mlgw/dashboard.env
 ExecStart=/opt/node/bin/node scripts/dashboard.mjs
 Restart=on-failure
@@ -21,6 +22,7 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/var/lib/mlgw/data/collector
+ReadOnlyPaths=/var/lib/mlgw/data/collector/archive
 MemoryMax=768M
 
 [Install]

@@ -1,16 +1,18 @@
-import { mkdirSync, readFileSync, writeFileSync, linkSync, unlinkSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, linkSync, unlinkSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve, relative, isAbsolute, basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { createHash, randomUUID } from 'node:crypto';
 import { PARSER_VERSION } from '../contract.mjs';
+import { durableDirectory, syncDirectory } from '../runtime/durable-files.mjs';
+import { PROJECTION_VERSION } from './projection.mjs';
 
 export const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const MAX_BODY = 10 * 1024 * 1024;
 export class Archive {
   constructor(root, { readOnly = false } = {}) {
     this.root = resolve(root);
-    if (!readOnly) mkdirSync(this.root, { recursive: true });
+    if (!readOnly) durableDirectory(this.root);
   }
   path(key) {
     const target = resolve(this.root, key), child = relative(this.root, target);
@@ -18,7 +20,7 @@ export class Archive {
     return target;
   }
   put(key, bytes, { matchesExisting = existing => existing.equals(Buffer.from(bytes)) } = {}) {
-    const target = this.path(key); mkdirSync(dirname(target), { recursive: true });
+    const target = this.path(key); durableDirectory(dirname(target));
     const temp = `${target}.${randomUUID()}.tmp`;
     writeFileSync(temp, bytes, { flag: 'wx', flush: true });
     try {
@@ -28,6 +30,7 @@ export class Archive {
         if (error.code !== 'EEXIST') throw error;
         if (!matchesExisting(readFileSync(target))) throw new Error(`Immutable object conflict: ${key}`);
       }
+      syncDirectory(dirname(target));
     } finally { unlinkSync(temp); }
     return key;
   }
@@ -64,7 +67,7 @@ export class Archive {
       if (!record[name].sha256 || digest(body) !== record[name].sha256) throw new Error('Source body checksum mismatch');
       bodies[name] = this.putBody(body);
     }
-    const manifest = { archiveVersion: 1, record, bodies, parserVersion: PARSER_VERSION, parserHash, parserKey };
+    const manifest = { archiveVersion: 1, record, bodies, parserVersion: PARSER_VERSION, parserHash, parserKey, projectionVersion: PROJECTION_VERSION };
     const bytes = Buffer.from(JSON.stringify(manifest));
     const key = `manifests/${record.id}.json`;
     this.put(key, bytes);

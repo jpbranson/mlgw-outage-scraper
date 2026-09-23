@@ -12,28 +12,8 @@ Chart.register(...registerables);
 Chart.defaults.font.family = 'Arial, Helvetica, sans-serif';
 Chart.defaults.font.size = 16;
 Chart.defaults.color = '#333333';
-type Metric = 'customers' | 'outages';
-type Capture = { id: string; at: number; capturedAt: string; customers: number; outages: number };
-type SourceTime = { utc: string | null; raw: string | null; status: string };
-type Feature = { type: 'Feature'; id: string; geometry: { type: 'Point'; coordinates: [number, number] } | null;
-  properties: { customers: number; status: string | null; started: SourceTime; estimatedRepair: SourceTime } };
-type Snapshot = { summary: (Capture & { change: number | null; previousAt: string | null; dailyPeak: number; peakDay: string;
-  dailyPeakAt: string; sharpRise: boolean; highBaseline: boolean; baseline: { enabled: boolean; coverage: number; explanation: string; threshold: number | null } }) | null;
-  detail: { available: boolean; reason?: string; geojson?: { features: Feature[] }; unmapped?: number; flags?: string[];
-    longRunning?: { id: string; customers: number; startedAt: string; hours: number }[]; unknownStartTimes?: number } };
-type Health = { status: string; ageMinutes: number | null; latest: Capture | null; firstCaptureAt: string | null; lastAttemptOutcome: string | null };
-type Point = { at: number; id: string | null; outageId?: string; customers: number | null; outages: number | null;
-  capturedAt?: string; outageCapturedAt?: string; coverage?: number | null };
-type Series = { from: number; to: number; resolution: string; points: Point[]; coverage: number; observedSnapshots: number; firstCaptureAt: string | null;
-  meaning: string; anomalies: { id: string; at: number; explanation: string }[]; quality: { outcome: string; count: number }[]; gaps: { from: number; to: number }[] };
-type SpatialCell = { id: string; center?: [number, number]; events: number | null; uncertainEvents: number;
-  peakCustomers: number | null; firstSeenAt: number | null; lastSeenAt: number | null; name?: string;
-  population?: number | null; populationMoe?: number | null; populationUncertain?: boolean;
-  eventsPer1000?: number | null; customersPer1000?: number | null };
-type SpatialHistory = { from: number; to: number; cells: SpatialCell[]; geography?: string;
-  reportedEvents: number; mappedEvents: number; uncertainEvents: number; captures: number; verifiedCaptures: number;
-  unavailableCaptures: number; unmappedObservations: number; firstVerifiedAt: number | null; lastVerifiedAt: number | null;
-  coverage: number; meaning: string };
+import { api } from './api';
+import type { Metric, Capture, SourceTime, Feature, Snapshot, Health, Point, Series, SpatialCell, SpatialHistory } from './api-types';
 const el = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const put = (id: string, value: string) => { el(id).textContent = value; };
 const fmt = new Intl.NumberFormat('en-US');
@@ -66,12 +46,6 @@ const rainfall = new RainfallControls(map,range=>{
 });
 const showError = (message: string) => { put('error-text', message); el('error').hidden = false; };
 const clearError = () => { el('error').hidden = true; };
-async function api<T>(path: string): Promise<T> {
-  const response = await fetch(path, { signal: AbortSignal.timeout(15000) });
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error ?? 'Unable to read the local archive.');
-  return data as T;
-}
 function mapNotice(message = mapMessage) {
   mapMessage = message;
   const content = message || (tilesFailed ? 'Basemap unavailable. Reported outage points remain visible.' : '');
@@ -258,7 +232,11 @@ function renderSnapshot(data: Snapshot) {
   put('selection-mode', followLatest ? 'Latest capture' : 'Historical capture');
   el('selection-mode').dataset.historical = String(!followLatest);
   put('selected-time', s ? time(s.capturedAt, true) : 'No accepted capture');
-  put('selected-note', s ? `Retrieved ${new Date(s.at).toISOString().replace('.000', '')} · current GeoJSON format` : 'Choose another archive date or return to latest.');
+  const warnings = [...new Set((data.warnings ?? []).map(code =>
+    code.startsWith('start_') || code.startsWith('repair_') ? 'some source times are uncertain' :
+    code === 'invalid_geometry' || code === 'outside_review_bounds' ? 'some locations need review' :
+    code === 'html_customer_mismatch' ? 'the source summary has a different customer total' : 'some source details need review'))];
+  put('selected-note', s ? `Retrieved ${new Date(s.at).toISOString().replace('.000', '')} · current GeoJSON format${warnings.length ? `. Counts accepted; ${warnings.join('; ')}.` : ''}` : 'Choose another archive date or return to latest.');
   put('customers', s ? fmt.format(s.customers) : '—'); put('outages', s ? fmt.format(s.outages) : '—');
   put('change', s?.change != null ? `${s.change > 0 ? '+' : ''}${fmt.format(s.change)}` : '—');
   el('change').dataset.direction = s?.change == null || s.change === 0 ? 'flat' : s.change > 0 ? 'up' : 'down';

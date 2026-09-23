@@ -18,13 +18,14 @@ export function locationCell(coordinates) {
 // Each source ID/start pair is provisional, not a confirmed unique incident.
 // Deduplicate repeated polls within each fixed cell; never sum customer counts over time.
 export async function spatialHistory({ rows, from, to, readDetail, comparable, locate = locationCell,
-  maxObservations = 1000000, maxEvents = 50000, maxMillis = 10000 }) {
+  maxObservations = 1000000, maxEvents = 50000, maxMillis = 10000, signal }) {
   if (rows.reduce((n, row) => n + row.outages, 0) > maxObservations)
     throw new SpatialLimitError('Too many observations for one historical map. Choose a shorter period, such as 6h.');
   const began = performance.now(), cells = new Map(), events = new Map(), ids = new Map();
   let verifiedCaptures = 0, unavailableCaptures = 0, unmappedObservations = 0, coveredMs = 0, previous = null;
   let firstVerifiedAt = null, lastVerifiedAt = null;
   for (let index = 0; index < rows.length; index++) {
+    signal?.throwIfAborted();
     if (performance.now() - began > maxMillis)
       throw new SpatialLimitError('Historical replay exceeded the local time limit. Choose a shorter period.');
     const row = rows[index], detail = await readDetail(row);

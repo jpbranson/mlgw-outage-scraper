@@ -3,12 +3,15 @@ import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { collectWithRetries, retryDecision } from './scheduling.mjs';
 import { INTERVAL_MS } from './rollups.mjs';
+import { syncDirectory } from '../runtime/durable-files.mjs';
 
 // Only redundant production staging files are removed. The verified canonical
 // archive, manifests, pinned parsers and local trial inbox are never pruned here.
 export function finishStagedAttempt(collector, directory, record) {
   if (!/^[a-zA-Z0-9_-]{1,120}$/.test(record.id) || !collector.has(record.id)) throw Error('Attempt is not durably indexed');
-  const { manifest } = collector.archive.readManifest(`manifests/${record.id}.json`);
+  const { manifest, hash } = collector.archive.readManifest(`manifests/${record.id}.json`);
+  if (collector.db.prepare('SELECT manifest_hash FROM poll_attempts WHERE id=?').get(record.id).manifest_hash !== hash)
+    throw Error('Indexed attempt differs from its archive');
   if (!isDeepStrictEqual(manifest.record, record)) throw Error('Staged attempt differs from its archive');
   for (const name of ['feed', 'html']) {
     if (record[name]?.file) collector.archive.readBody(manifest.bodies[name]);
@@ -17,6 +20,7 @@ export function finishStagedAttempt(collector, directory, record) {
     try { unlinkSync(join(directory, `${record.id}.${suffix}`)); }
     catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
+  syncDirectory(directory);
 }
 
 export async function recoverProduction(collector, directory, owner, now = Date.now, { scanArchive = true } = {}) {
@@ -29,7 +33,14 @@ export async function recoverProduction(collector, directory, owner, now = Date.
   for (const name of readdirSync(directory).filter(name => name.endsWith('.attempt.json')).sort()) {
     if (!collector.acquireLease(owner, now())) throw Error('Collector lease lost during staging recovery');
     const record = JSON.parse(readFileSync(join(directory, name), 'utf8'));
-    collector.import(record, directory, { leaseOwner: owner });
+    let canonical;
+    if (!/^[a-zA-Z0-9_-]{1,120}$/.test(record.id) || name !== `${record.id}.attempt.json`) throw Error('Invalid staging identity');
+    try { canonical = collector.archive.readManifest(`manifests/${record.id}.json`); }
+    catch (error) { if (error.code !== 'ENOENT') throw error; }
+    if (canonical) {
+      if (!isDeepStrictEqual(canonical.manifest.record, record)) throw Error('Staged attempt differs from its archive');
+      if (!collector.has(record.id)) collector.publish(canonical, await collector.archive.parser(canonical.manifest), { leaseOwner: owner });
+    } else collector.import(record, directory, { leaseOwner: owner });
     finishStagedAttempt(collector, directory, record);
   }
   while (collector.maintain()) { /* drain recovered rollups before serving */ }
@@ -42,7 +53,8 @@ export async function recoverProduction(collector, directory, owner, now = Date.
 export async function productionStep({ collector, config, state, owner, capture, persist, now = Date.now, sleepImpl }) {
   if (state.stopReason) return { action: 'stopped', reason: state.stopReason };
   if (!collector.acquireLease(owner, now())) return { action: 'lease_busy' };
-  if (collector.storage(config).pressure === 'urgent') {
+  state.storage = collector.storage(config, { now: now() });
+  if (state.storage.pressure === 'urgent') {
     state.stopReason = 'storage_pressure'; await persist(state);
     return { action: 'stopped', reason: state.stopReason };
   }

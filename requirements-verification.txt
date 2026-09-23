@@ -1,0 +1,2 @@
+# Windows needs an IANA database; Linux also receives this pinned fallback.
+tzdata==2025.2

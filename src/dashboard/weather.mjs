@@ -3,11 +3,26 @@ import {join,resolve} from 'node:path';
 import {createHash} from 'node:crypto';
 import {instant} from '../weather/sources.mjs';
 import {RequestError} from './service.mjs';
+import {logError} from '../runtime/logging.mjs';
 const HOUR=3600000;
 const digest=b=>createHash('sha256').update(b).digest('hex');
 export class WeatherService {
   constructor(root,{rollingRoot}={}){this.root=resolve(root);this.rolling=rollingRoot?new WeatherService(rollingRoot):null;}
   catalog() {
+    let saved, live, savedError;
+    try {saved=this.ownCatalog();} catch(error) {savedError=error;logError('weather.saved_catalog',error);saved={version:1,entries:[],updatedAt:null,savedUnavailable:true};}
+    if(this.rolling) {
+      try {live=this.rolling.ownCatalog();} catch(error) {logError('weather.rolling_catalog',error);saved.rollingUnavailable=true;}
+    }
+    if(live) {
+      const known=new Set(saved.entries.map(e=>e.identity));
+      saved.entries.push(...live.entries.filter(e=>!known.has(e.identity)).map(e=>({...e,rolling:true})));
+      saved.updatedAt=[saved.updatedAt,live.updatedAt].filter(Boolean).sort().at(-1)??null;
+    }
+    if(savedError&&!live?.entries.length)throw savedError;
+    return saved;
+  }
+  ownCatalog() {
     const path=join(this.root,'published/catalog.json');
     try {
       if(statSync(path).size>1024*1024)throw Error('Weather catalog limit');
@@ -16,10 +31,6 @@ export class WeatherService {
       for(const e of c.entries) {
         if(!['radar','rainfall','metar','rainfall-period'].includes(e.product)||!/^[a-f0-9]{64}$/.test(e.sha256)||!Number.isFinite(instant(e.validAt)))throw Error('Weather catalog entry invalid');
         if(e.product==='rainfall-period'&&(![24,48,72].includes(e.hours)||instant(e.intervalEnd)!==instant(e.validAt)||instant(e.intervalEnd)-instant(e.intervalStart)!==e.hours*HOUR))throw Error('Invalid rainfall period');
-      }
-      if(this.rolling) {
-        try {const live=this.rolling.catalog();const known=new Set(c.entries.map(e=>e.identity));c.entries.push(...live.entries.filter(e=>!known.has(e.identity)).map(e=>({...e,rolling:true})));c.updatedAt=[c.updatedAt,live.updatedAt].filter(Boolean).sort().at(-1)??null;}
-        catch {c.rollingUnavailable=true;}
       }
       return c;
     }catch(e){if(e.code==='ENOENT')return {version:1,entries:[],updatedAt:null};throw e;}
@@ -52,7 +63,7 @@ export class WeatherService {
           imageUrl:`/api/weather/image/${entry.sha256}`,bbox:data.bbox,legend:data.legend,units:data.units,
           intervalStart:data.intervalStart??null,intervalEnd:data.intervalEnd??null,summary:data.summary??null,qualityFlags:data.qualityFlags,
           provider:data.provider,sourceUrl:data.sourceUrl,nativeGrid:data.nativeGrid};
-      }catch{result[product].reason='The selected weather image could not be verified.';}
+      }catch(error){logError('weather.image',error,{product,sha256:entry.sha256});result[product].reason='The selected weather image could not be verified.';}
     }
     const records=new Map();let broken=false;
     // A rolling 24-hour plot needs at most two hourly-ending METAR batches. Each

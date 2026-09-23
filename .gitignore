@@ -10,3 +10,5 @@ reports/*.log
 reports/*.png
 __pycache__/
 *.pyc
+test-results/
+playwright-report/

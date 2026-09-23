@@ -2,9 +2,12 @@ import { createServer } from 'node:http';
 import { readFileSync } from 'node:fs';
 import { extname, resolve, relative, isAbsolute } from 'node:path';
 import { RequestError } from './service.mjs';
+import { isIP } from 'node:net';
+import { logError } from '../runtime/logging.mjs';
 
 export function createDashboardServer(service, { staticRoot, tiles = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120, weather, legacy, comparisons, publicOrigin } = {}) {
+  attribution = '© OpenStreetMap contributors', attributionUrl = 'https://www.openstreetmap.org/copyright', requestLimit = 120,
+  aggregateLimit = 600, trustLoopbackProxy = false, logger = logError, weather, legacy, comparisons, publicOrigin } = {}) {
   let publicUrl;
   if (publicOrigin) {
     publicUrl = new URL(publicOrigin);
@@ -14,8 +17,12 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
   const tileOrigin = tiles ? new URL(tiles).origin : '';
   if (tiles && !tiles.startsWith('https://')) throw new Error('Tile URL must use HTTPS, or be empty to disable tiles.');
   let windowStart = 0, requests = 0;
+  const clients = new Map();
   return createServer(async (req, res) => {
+    const controller = new AbortController();
+    res.on('close', () => { if (!res.writableEnded) controller.abort(); });
     const send = (status, body, type = 'application/json; charset=utf-8', cache = 'no-store') => {
+      if (res.destroyed) return;
       const bytes = Buffer.isBuffer(body) || typeof body === 'string' ? body : JSON.stringify(body);
       if (Buffer.byteLength(bytes) > 12 * 1024 * 1024) { res.writeHead(413); res.end('Response limit exceeded'); return; }
       res.writeHead(status, { 'Content-Type': type, 'Cache-Control': cache, 'X-Content-Type-Options': 'nosniff',
@@ -33,8 +40,22 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
       const url = new URL(req.url, `http://${req.headers.host}`), path = url.pathname;
       if (url.search.length > 1024 || path.length > 240) throw new RequestError('Request exceeds limit.');
       if (path.startsWith('/api/')) {
-        if (Date.now() - windowStart >= 60000) { windowStart = Date.now(); requests = 0; }
-        if (++requests > requestLimit) { res.setHeader('Retry-After', '60'); throw new RequestError('Local request budget reached. Retry in one minute.', 429); }
+        // Freshness probes cannot be starved by an expensive-query quota.
+        if (path === '/api/health') return send(200, service.health());
+        if (path === '/api/ready') { const health = service.health(); return send(health.status === 'ok' ? 200 : 503, health); }
+        if (Date.now() - windowStart >= 60000) { windowStart = Date.now(); requests = 0; clients.clear(); }
+        let client = req.socket.remoteAddress;
+        if (trustLoopbackProxy && isPublic && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(client)) {
+          const forwarded = String(req.headers['x-forwarded-for'] ?? '').split(',').at(-1).trim();
+          if (isIP(forwarded)) client = forwarded;
+        }
+        const count = (clients.get(client) ?? 0) + 1;
+        if (clients.size >= 4096 && !clients.has(client)) throw new RequestError('Request budget reached.', 429);
+        clients.set(client, count);
+        if (count > requestLimit || ++requests > aggregateLimit) {
+          res.setHeader('Retry-After', String(Math.max(1, Math.ceil((windowStart + 60000 - Date.now()) / 1000))));
+          throw new RequestError('Request budget reached. Retry in one minute.', 429);
+        }
         if (path.startsWith('/api/legacy/') && comparisons && ['comparison','comparisons'].includes(url.searchParams.get('view'))) {
           if (path === '/api/legacy/catalog') return send(200, comparisons.catalog());
           if (path === '/api/legacy/series') return send(200, comparisons.series(url.searchParams));
@@ -72,10 +93,9 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
         if (path === '/api/config') return url.searchParams.get('view') === 'census'
           ? send(200, service.censusAreas().data, undefined, 'private, max-age=86400')
           : send(200, { tiles, attribution, attributionUrl });
-        if (path === '/api/health') return send(200, service.health());
         if (path === '/api/latest') return send(200, await service.latest());
         if (path === '/api/series') return send(200, url.searchParams.get('view') === 'spatial'
-          ? await service.spatial(url.searchParams) : service.series(url.searchParams), undefined, 'private, max-age=30');
+          ? await service.spatial(url.searchParams, { signal: controller.signal }) : service.series(url.searchParams), undefined, 'private, max-age=30');
         if (path === '/api/snapshots') return send(200, service.snapshots(url.searchParams.get('date')));
         if (path.startsWith('/api/snapshot/')) return send(200, await service.snapshot(path.slice(14)), undefined, 'private, max-age=60');
         if (path === '/api/export.csv') {
@@ -102,6 +122,10 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
       let bytes;
       try { bytes = readFileSync(target); } catch { throw new RequestError('Client build missing. Run npm run dashboard:build.', 404); }
       send(200, bytes, types[extname(target)], 'no-cache');
-    } catch (error) { send(error instanceof RequestError ? error.status : 503, { error: error instanceof RequestError ? error.message : 'The local archive is temporarily unavailable. Retry shortly.' }); }
+    } catch (error) {
+      if (controller.signal.aborted) return;
+      if (!(error instanceof RequestError)) logger('dashboard.request', error, { path: req.url?.split('?')[0], method: req.method });
+      send(error instanceof RequestError ? error.status : 503, { error: error instanceof RequestError ? error.message : 'The local archive is temporarily unavailable. Retry shortly.' });
+    }
   });
 }

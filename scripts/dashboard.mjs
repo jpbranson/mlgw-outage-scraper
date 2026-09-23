@@ -12,6 +12,7 @@ const legacy = new LegacyService(resolve('data/legacy/dashboard'));
 const port = Number(process.env.DASHBOARD_PORT ?? 4173);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) throw new Error('DASHBOARD_PORT must be 1024–65535');
 const server = createDashboardServer(service, { staticRoot: resolve('dist/dashboard'), legacy, comparisons: new ComparisonService(resolve('data/comparisons')), weather: new WeatherService(resolve('data/weather/cache'),{rollingRoot:resolve('data/weather/live-cache')}),
+  trustLoopbackProxy: process.env.DASHBOARD_TRUST_PROXY === '1',
   ...(process.env.PUBLIC_ORIGIN ? { publicOrigin: process.env.PUBLIC_ORIGIN } : {}),
   ...(process.env.DASHBOARD_TILES !== undefined ? { tiles: process.env.DASHBOARD_TILES } : {}),
   ...(process.env.DASHBOARD_TILE_ATTRIBUTION ? { attribution: process.env.DASHBOARD_TILE_ATTRIBUTION } : {}),

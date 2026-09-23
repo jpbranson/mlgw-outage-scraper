@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { Archive } from '../durable/archive.mjs';
 import { spatialHistory, SpatialLimitError } from './spatial.mjs';
 import { CensusAreas } from './census.mjs';
+import { logError } from '../runtime/logging.mjs';
 
 export const DAY = 86400000, SLOT = 300000, MAX_GAP = 450000;
 export const SOURCE = { name: 'Memphis Light, Gas and Water', url: 'https://outagemap.mlgw.org/OutageSummary.php',
@@ -41,11 +42,13 @@ const text = value => typeof value === 'string' ? value.slice(0, 1000) : null;
 const publicTime = value => ({ utc: value?.utc ?? null, raw: text(value?.raw), status: text(value?.status) });
 
 export class DashboardService {
-  constructor(root, { now = () => Date.now(), localOnly = true } = {}) {
+  constructor(root, { now = () => Date.now(), localOnly = true, logger = logError } = {}) {
     this.db = new DatabaseSync(join(root, 'index.sqlite'), { readOnly: true, timeout: 5000 });
     this.archive = new Archive(join(root, 'archive'), { readOnly: true });
     this.now = now;
     this.localOnly = localOnly;
+    this.logger = logger;
+    this.spatialCache = new Map();
   }
   close() { this.db.close(); }
   row(id) { return this.db.prepare(`${SELECT} WHERE ${GOOD} AND s.id=?`).get(id); }
@@ -81,7 +84,8 @@ export class DashboardService {
     if (!/^[a-zA-Z0-9_-]{1,120}$/.test(id)) throw new RequestError('Invalid capture ID.');
     const row = this.row(id);
     if (!row) throw new RequestError('Accepted capture not found.', 404);
-    return { summary: this.summary(row), source: SOURCE, quality: 'valid', detail: await this.mapDetail(row) };
+    const flags = JSON.parse(this.db.prepare('SELECT flags_json FROM snapshots WHERE id=?').get(id).flags_json);
+    return { summary: this.summary(row), source: SOURCE, quality: 'valid', warnings: [...new Set(flags.map(f => f.code))], detail: await this.mapDetail(row) };
   }
   async mapDetail(row) {
     const id = row.id;
@@ -104,23 +108,31 @@ export class DashboardService {
           .map(f => ({ id: f.id, customers: f.properties.customers, startedAt: f.properties.started.utc,
             hours: (row.at - Date.parse(f.properties.started.utc)) / 3600000 })).sort((a, b) => b.hours - a.hours),
         unknownStartTimes: features.filter(f => !f.properties.started.utc).length };
-    } catch {
+    } catch (error) {
+      this.logger('dashboard.replay', error, { captureId: id });
       return { available: false, reason: 'Archived map detail is unavailable or could not be verified. Accepted totals remain available.' };
     }
   }
-  async spatial(params) {
+  async spatial(params, { signal } = {}) {
     const rangeParams = new URLSearchParams(params); rangeParams.set('resolution', 'daily');
     const { from, to } = period(rangeParams, this.now());
     const geography = params.get('geography') || 'grid';
     if (!['grid', 'block-group'].includes(geography)) throw new RequestError('Choose grid or block-group geography.');
+    signal?.throwIfAborted();
+    const generation = this.db.prepare('PRAGMA data_version').get().data_version;
+    const cacheKey = JSON.stringify([generation, from, to, geography]), cached = this.spatialCache.get(cacheKey);
+    if (cached && this.now() - cached.at < 30000) return cached.data;
     const census = geography === 'block-group' ? this.censusAreas() : null;
     if (this.spatialBusy) throw new RequestError('A historical map is already loading. Retry shortly.', 429);
     this.spatialBusy = true;
     try {
-      const history = await spatialHistory({ rows: this.rows(from, to), from, to,
+      const history = await spatialHistory({ rows: this.rows(from, to), from, to, signal,
         readDetail: row => this.mapDetail(row), comparable: (a, b) => this.comparable(a, b),
         ...(census ? { locate: coordinates => census.locate(coordinates) } : {}) });
-      return census ? census.normalize(history) : history;
+      const data = census ? census.normalize(history) : history;
+      if (this.spatialCache.size >= 4) this.spatialCache.delete(this.spatialCache.keys().next().value);
+      this.spatialCache.set(cacheKey, { at: this.now(), data });
+      return data;
     } catch (error) {
       if (error instanceof SpatialLimitError) throw new RequestError(error.message, 413);
       throw error;

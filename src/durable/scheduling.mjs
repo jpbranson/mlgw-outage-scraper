@@ -7,7 +7,7 @@ export function retryDecision(record, attempt, now = Date.now()) {
     return { action: 'backoff', until: Math.max(now + INTERVAL_MS, Date.parse(record.retryAt ?? '') || now) };
   }
   const status = record.feed?.status;
-  const transient = status == null || status === 408 || status >= 500;
+  const transient = status == null || status === 408 || status >= 500 || record.feed?.bodyComplete === false;
   if (transient && attempt < 2) return { action: 'retry' };
   return { action: 'next_slot' };
 }
