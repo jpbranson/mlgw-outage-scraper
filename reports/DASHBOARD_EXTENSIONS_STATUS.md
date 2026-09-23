@@ -50,6 +50,6 @@ September 23, 2026. This checkpoint implements the four interface extensions tha
 ## Limits
 
 - Rolling totals exist only for the last day, and only 24-hour windows. A 48- or 72-hour rolling window would need more retained hourly originals than the 256 MiB rolling budget reliably allows alongside four hours of radar. Longer storm periods still use explicit, bounded saved-period preparation.
-- **Not yet deployed.** The release was not packaged or activated, because the automated permission check stopped the deployment step; a verified pre-upgrade backup was taken. After activation the runner upgrades the VM's retained frames once. That cache held only 23 frames, so the first complete window appears after the next hourly frame is added under the 28-hour retention.
+- **Deployed September 23 at 07:45 UTC.** The runner's first run on the new code upgraded the VM's 23 retained frames. That cache held only 23 frames, so the first complete window appears after the next hourly frame is added under the 28-hour retention.
 - Paired outage maps cover current-format collection only. Before September 16, 2026, legacy regional totals remain on the Weather comparisons page. Legacy grid polygons are not mixed into the current-feed density map.
 - Episode links reproduce the selected interval. A later import of late captures can change coverage within that interval.
