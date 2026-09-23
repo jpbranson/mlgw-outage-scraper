@@ -1,8 +1,10 @@
 # MLGW outage history and dashboard: design plan
 
-Prepared September 16, 2026; deployment selection and current operating state updated September 22, 2026. See [current status and the documentation index](reports/PROJECT_STATUS.md). Editing this plan does not itself authorize additional implementation work.
+Prepared September 16, 2026; operating state reconciled after the September 22–23 audit release. See [current status and the documentation index](reports/PROJECT_STATUS.md). Editing this plan does not itself authorize additional implementation work.
 
 **September 22 deployment:** the user selected a DigitalOcean Linux VM and public-IP access, and authorized deployment. The $12/month, 1 CPU / 2 GB / 50 GB Ubuntu VM now hosts the existing filesystem/SQLite application at https://64.225.60.118. Linux services run five-minute outage collection and 30-minute weather refresh continuously. All retained history was verified during migration, and local collectors are stopped. HTTPS and certificate renewal are configured. The [deployment guide](reports/DIGITALOCEAN_DEPLOYMENT.md) supersedes earlier local-only and free-first implementation assumptions below; long-term retention and evidence protections remain in force.
+
+**September 22–23 audit release:** [recovery and operational hardening](reports/TECHNICAL_AUDIT_IMPLEMENTATION.md) is deployed, including schema-2 deterministic projection, explicit rebuild/rollback, per-client request limits and CI/browser checks. Verified full PC backups are installed for 10 AM Central daily and at user login; downloads require this PC online with the user signed in. External monitoring is prepared but unconfigured by choice. Long-term automatic offload and deletion remain future work.
 
 **Historical scope, September 18:** collection, validation and the dashboard run locally. The 24-hour pilot passed; the seven-day collector trial continues. The dashboard, heatmap, Census per-capita maps, weather replay, legacy integration and two rainfall/wind cases with matched references are complete. The requested [autonomous continuation](reports/DEVELOPMENT_COMPLETION_STATUS.md) adds verified cold/heat comparisons, original legacy-grid cold summaries, isolated ongoing weather refresh/retention, a real-data desktop-transfer rehearsal and a guarded seven-day acceptance command. Three additional rainfall/wind candidates failed the existing reference screen; snow/ice and some heat periods lack sufficient outage coverage. Saved study evidence remains protected under a shared 1 GiB weather cap. The existing Quick Tunnel keeps its September 18 3:06 PM CDT expiry. Cloud provider validation/deployment and Phase 4B installation/cleanup still need account/runtime setup; unsupported source families, missing legacy evidence and richer local-exposure rankings remain open.
 
@@ -14,7 +16,7 @@ Prepared September 16, 2026; deployment selection and current operating state up
 
 The selected production implementation uses Node 24, immutable compressed filesystem archives, SQLite and a static dashboard on a DigitalOcean Linux VM. Caddy terminates HTTPS and proxies the loopback dashboard; systemd manages the collectors. The original Cloudflare proposal and its unrun benchmark remain historical alternatives. Keep the parser and analytics portable.
 
-Start with **five-minute collection**, with a configurable one-minute option after measuring the source's actual update frequency. Keep detailed observations indefinitely where practical. Retain them in the cloud while space permits; under storage pressure, transfer detail older than one year to this Windows PC, verify it, and then remove only those verified cloud copies. Keep the newest year in cloud storage and long-term summaries available to the dashboard.
+Production uses **five-minute collection**; a future one-minute option requires source-frequency measurements and implementation changes, because the current production configuration rejects other cadences. Keep detailed observations indefinitely where practical. Retain them in the cloud while space permits. The planned long-term offload protocol would transfer detail older than one year to this Windows PC under storage pressure, verify it and then remove only those verified cloud copies. Keep the newest year in cloud storage and long-term summaries available to the dashboard. Current full backups preserve all canonical cloud history and do not enable this deletion protocol.
 
 The dashboard is **accessible to anyone with its link**, with light expected use. The user selected the **$12/month DigitalOcean VM** after considering cloud options. Additional paid backup or storage products are not enabled automatically.
 
@@ -33,7 +35,7 @@ The weather extension will also answer:
 
 ### Confirmed requirements and remaining setup choices
 
-The audience, retention intent and 30-day offline-PC allowance retain the user's September 16 requirements. The September 22 choice of a $12/month DigitalOcean VM supersedes the original free-first hosting preference. Cloud deployment is complete; recurring desktop backup scheduling and long-term offload installation remain separate work.
+The audience, retention intent and 30-day offline-PC storage allowance retain the user's September 16 requirements. The September 22 choice of a $12/month DigitalOcean VM supersedes the original free-first hosting preference. Cloud deployment and recurring full PC backups are installed; long-term offload remains separate work. The 30-day allowance is a capacity-planning requirement, not a backup-freshness guarantee: private health degrades when the verified PC backup is over 36 hours old.
 
 | Decision | Requirement or selected approach | Implementation implication |
 | --- | --- | --- |
@@ -154,7 +156,7 @@ Track two independent health measures: **last successful retrieval** and **evide
 
 ## 4. Deployed cloud architecture
 
-One DigitalOcean Ubuntu VM runs the existing Node/filesystem/SQLite application. Separate systemd services isolate the outage collector, rolling weather refresh and read-only dashboard. Caddy terminates HTTPS at the selected public IP and proxies the dashboard on loopback. A health timer checks freshness, runner heartbeats and free disk space; a separate timer renews the IP certificate.
+One DigitalOcean Ubuntu VM runs the existing Node/filesystem/SQLite application. Separate systemd services isolate the outage collector, rolling weather refresh and read-only dashboard. Caddy terminates HTTPS at the selected public IP and proxies the dashboard on loopback. A health timer checks observation/weather freshness, runner heartbeats, storage pressure, free disk space and a verified PC backup no older than 36 hours; a separate timer renews the IP certificate.
 
 ```mermaid
 flowchart LR
@@ -169,14 +171,14 @@ flowchart LR
     A --> P[Caddy HTTPS at public IP]
     P --> U[Browser]
     H[Private health timer] --> A
-    R --> B[On-demand backup over SSH]
+    R --> B[Scheduled and manual full backups over SSH]
     E --> B
     B --> L[Verified backup on PC]
 ```
 
-The public dashboard has no viewer login and exposes only allowlisted reads. Canonical raw archives, administrative operations and backup downloads are not public routes; administration uses SSH. Runtime services use the unprivileged `mlgw` account and dedicated writable directories. Credentials and local trial state were excluded from deployment bundles.
+The public dashboard has no viewer login and exposes only allowlisted reads. Canonical raw archives, administrative operations and backup downloads are not public routes; administration uses SSH. Runtime services use the unprivileged `mlgw` account and dedicated writable directories. The dashboard's canonical archive mount is read-only, with write access retained only where SQLite WAL coordination requires it. Data routes have per-client and aggregate limits; `/api/health` remains available under quota pressure, and `/api/ready` returns 503 when current observations are unhealthy. Credentials and local trial state were excluded from deployment bundles.
 
-The production collector has no trial deadline, restarts after failures and resumes its recorded schedule. Source restrictions, operator stop markers and urgent storage stops require review and survive service restarts. The two local PC collectors are stopped, so only the VM polls upstream sources. Recurring off-VM backups, external notifications and automatic deletion of canonical history are not installed.
+The production collector has no trial deadline, restarts after failures and resumes its recorded schedule. Source restrictions, operator stop markers and urgent storage stops require review and survive service restarts. The two local PC collectors are stopped, so only the VM polls upstream sources. The installed Windows task downloads and verifies full backups daily and at login. External notifications remain unconfigured by choice, and automatic deletion of canonical history remains disabled.
 
 ### Alternatives considered
 
@@ -207,21 +209,24 @@ Byte-identical responses can share archived bodies, while each attempt retains i
 | Table | Stored purpose |
 | --- | --- |
 | `poll_attempts` | Attempt ID, scheduled/received times, HTTP status, outcome/error, archive keys and hashes |
+| `attempt_facts` | Compact projection inputs for deterministic slot selection and zero confirmation, including counts, HTML totals, flags and recent event keys |
 | `snapshots` | Unique accepted slot, capture time, raw key/hash, parser identity, quality and recent event-key cache |
 | `totals` | Snapshot ID, affected customers and reported outages |
 | `rollups` | Resolution/bucket, customer-minutes, covered minutes, mean/peak customers, peak outages and observation count |
 | `leases` | Collector owner and expiration |
 | `collector_state` / `maintenance_queue` | Internal state and queued rollup days |
 
-The exact schema is `src/durable/schema.sql`. Time indexes and unique slot constraints bound reads and prevent duplicate publication. Coverage accompanies rollups. The canonical archive can rebuild SQLite; copying only an open SQLite main file is not a valid live backup.
+The exact schema is `src/durable/schema.sql`, version 2. Projection policy `outage-projection-v2` selects the earliest valid candidate per slot with a stable ID tie break and re-evaluates dependent zero classifications after late imports. Time indexes and unique slot constraints bound reads and prevent duplicate publication. Coverage accompanies rollups. Older or unknown schemas require an explicit separate rebuild using `scripts/rebuild-index.mjs`; the canonical archive and pinned parsers reproduce the index. Copying only an open SQLite main file is not a valid live backup.
 
 Production has a 20 GB collector budget, a 5 GB free-disk reserve and warning/offload/urgent fractions of 70%/80%/90%. These are pressure thresholds, not installed automatic offload jobs. Preserve the newest year and older evidence while capacity permits; review growth before those thresholds are reached.
 
 ### Automatic archiving to this PC
 
-**Earlier implementation boundary, September 18:** the [local transfer core](reports/DEVELOPMENT_COMPLETION_STATUS.md#desktop-transfer-core-and-rehearsal) now supplies bounded bundles, resumable downloads, a SQLite verification catalog, authenticated receipts, restore and a non-executable cleanup-eligibility calculation. An actual 89-capture partition passed download/restore/replay. The cloud receipt receiver, transactional cleanup journal and recurring installation described below remain unimplemented. Since September 22, a separate SSH backup command downloads full verified bundles to the PC using an ACL-protected local key. Its first cloud backup passed an offline restore. This does not implement the future offload/receipt/deletion protocol; no canonical source cleanup is enabled.
+**Current backup implementation:** `npm run deploy:backup` downloads full verified bundles over SSH using an ACL-protected local key. The installed Windows task runs daily at 10 AM Central and at login, with three 30-minute retries and no overlapping runs. The PC must be online with the user signed in. Packages and receipts accumulate in `data/deployment/backups/`, with task output in `reports/scheduled-backup.log`. A verified cloud receipt is recorded after the local checksum succeeds; only temporary remote packaging is removed. Full-backup restore was verified. No automatic deletion of PC backups or canonical cloud history is enabled.
 
-Implement the requested cloud-to-desktop transfer as a **desktop-initiated download**. A Windows Scheduled Task contacts the cloud over outbound HTTPS, so the PC needs no public address, open inbound port, or always-running web server. Run daily, resume after missed runs when the PC is available, and prevent overlapping executions. Installation and the target folder are later implementation tasks.
+**Long-term offload preparation:** the [local transfer core](reports/DEVELOPMENT_COMPLETION_STATUS.md#desktop-transfer-core-and-rehearsal) supplies bounded bundles, resumable downloads, a SQLite verification catalog, authenticated receipts, restore and a non-executable cleanup-eligibility calculation. An actual 89-capture partition passed download/restore/replay. The offload receipt transactions, cleanup journal and installation described below remain unimplemented; the scheduled full-backup task does not implement that protocol.
+
+The planned partition-offload protocol uses a **desktop-initiated download** over outbound HTTPS, so the PC needs no public address, open inbound port or always-running web server. It should run daily, resume after missed runs and prevent overlapping executions. Installing that resumable offload worker and selecting its final archive folder remain future tasks; the installed full-backup task currently uses SSH.
 
 The archive preserves original payloads, normalized geometry/properties, UTC observation metadata, schema/parser versions, quality flags, and per-file SHA-256 checksums. Use portable daily or monthly bundles with a manifest, bounded part sizes, and a small local SQLite catalog. A source-to-bundle index preserves every retained observation even when repeated bodies are deduplicated. Retain long-term chart summaries and the archive catalog in the cloud.
 
@@ -244,7 +249,7 @@ There is a real capacity boundary: offloading data older than a year cannot help
 
 Keep weather acquisition and processing separate from MLGW polling. Weather failures, rate limits or heavy raster processing must not delay outage capture or alter an accepted snapshot. Use a separate weather service, memory limit and cache budget. Cloud refresh and memory use were checked during deployment; heavy backfills remain bounded explicit work.
 
-The deployed weather service refreshes recent radar, hourly rainfall and KMEM METAR every 30 minutes continuously, using separate production state. The former PC runner is stopped. Its disposable cache is capped at 256 MiB within the shared 1 GiB weather budget; radar expires after four hours, rainfall/METAR after 24 hours. Saved study evidence never expires through this runner. Shared writer/budget locks preserve aggregate limits; source latency and matching tolerances can still leave weather unavailable. Annual GHCNh revisions and new study acquisition remain explicit bounded jobs. See [operation and stop/resume controls](README.md#automatic-weather-refresh). The VM schedule has no trial deadline; recurring backups and external alert delivery remain unconfigured.
+The deployed weather service refreshes recent radar, hourly rainfall and KMEM METAR every 30 minutes continuously, using separate production state. The former PC runner is stopped. Its disposable cache is capped at 256 MiB within the shared 1 GiB weather budget; radar expires after four hours, rainfall/METAR after 24 hours. Saved study evidence never expires through this runner. Shared writer/budget locks preserve aggregate limits; source latency and matching tolerances can still leave weather unavailable. Annual GHCNh revisions and new study acquisition remain explicit bounded jobs. See [operation and stop/resume controls](README.md#automatic-weather-refresh). The VM schedule has no trial deadline. Scheduled full backups include saved study evidence and exclude disposable rolling weather; external alerts remain unconfigured.
 
 - Maintain a weather manifest with provider, product/version, source URL, observation/valid time or interval, retrieval time, units, CRS/grid or station ID, quality/missing-data flags, checksum and processing version. Record original weather times even when displaying a nearest eligible frame.
 - Cache selected Memphis-area imagery and numeric subsets on demand. Use immutable timestamped cache keys, bounded time windows, request concurrency and retry/backoff. Avoid continuously retaining national radar volumes. Distinguish disposable display-cache entries from evidence required to reproduce a saved comparison.
@@ -362,7 +367,7 @@ GET /api/legacy/export.csv?view=comparison&id=june-2023&lag=0&table=reference
 GET /api/legacy/series?view=comparison&id=cold-2022&lag=0
 ```
 
-The weather routes read bounded saved and rolling catalogs and hash-verified prepared assets. They cannot launch collection or accept arbitrary upstream URLs. Phase 5 comparisons use the existing `/api/legacy/catalog`, `/api/legacy/series` and `/api/legacy/export.csv` routes with `view=comparison` (or `comparisons`), a prepared case ID (`june-2023`, `september-2024`, `cold-2022`, `heat-2023`) and a supported lag; `table=reference` selects paired CSV rows. The service merges the rainfall/wind catalog with `data/comparisons/conditions/catalog.json`; cold-grid summaries and geometry are included in the case JSON. Preview login is handled separately at `POST /preview/login`; the dashboard itself has no write routes. Preserve current authentication for temporary previews; a future public deployment needs its own quota, attribution and cache review.
+The weather routes read bounded saved and rolling catalogs and hash-verified prepared assets. They cannot launch collection or accept arbitrary upstream URLs. Phase 5 comparisons use the existing `/api/legacy/catalog`, `/api/legacy/series` and `/api/legacy/export.csv` routes with `view=comparison` (or `comparisons`), a prepared case ID (`june-2023`, `september-2024`, `cold-2022`, `heat-2023`) and a supported lag; `table=reference` selects paired CSV rows. The service merges the rainfall/wind catalog with `data/comparisons/conditions/catalog.json`; cold-grid summaries and geometry are included in the case JSON. Preview login is handled separately at `POST /preview/login`; the dashboard itself has no write routes. Retain authentication for any separately requested temporary preview. Public production access uses the request quotas, replay bounds and cache controls described in the [technical audit](reports/TECHNICAL_AUDIT_IMPLEMENTATION.md).
 
 The local API limits series to 31 days, with five-minute detail limited to two days; hourly/daily resolutions serve longer ranges. Responses are capped at 12 MiB, with a shared 120 API requests/minute budget. Latest/health reads use no-store, series cache privately for 30 seconds, snapshots for 60 seconds and Census geometry/weather PNGs for one day. The preview gateway overrides all responses to no-store/private. Future public caching needs a separate design. Return source attribution, quality flags, and capture times consistently. Escape source strings in popups. Keep database bindings, storage credentials, and administrative operations out of the browser.
 
@@ -441,7 +446,7 @@ The outage-only estimates above do **not** include weather imagery, numeric grid
 - Preserve historical heatmap and Census per-capita views, provisional event identity, uncertainty and coverage semantics.
 - Preserve the verified production boundary: raw archive/admin/write routes are unavailable publicly, and administration/backups use SSH. Recheck that boundary after server or proxy changes.
 
-**Exit:** selecting a timestamp available to the serving archive reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history. Public route checks against cloud-resident data passed at deployment; desktop/phone visual checks retain their earlier local dates because browser automation was unavailable during deployment.
+**Exit:** selecting a timestamp available to the serving archive reproduces its archived spatial state and totals; charts display failures as gaps; a desktop and mobile browser can use the page without downloading unbounded history. Public route checks against cloud-resident data passed at deployment and after the audit release. Browser automation was unavailable at the initial handoff; the later audit release passed four desktop/phone Playwright cases, with Windows/Linux CI now configured to run them.
 
 ### Phase 3A: local weather sources, radar replay and rainfall history
 
@@ -484,7 +489,7 @@ Split this phase into independent tracks so weather analysis can use older local
 
 #### Phase 4B: verified desktop transfer and cloud retention
 
-**Local transfer core and on-demand cloud backups are implemented; automated offload remains uninstalled.** The [autonomous checkpoint](reports/DEVELOPMENT_COMPLETION_STATUS.md) implements bounded bundles, resumed downloads, hashes, SQLite receipts, restore, authenticated verification and non-executable retention eligibility, and replays an actual 89-capture transferred partition. Cloud archive access and an ACL-protected SSH key are now available. The separate full-backup command has passed download and restore verification. Durable receipt transactions, cleanup journals, a final long-term destination and recurring installation remain future work. This is independent of local weather analysis.
+**Local transfer core and scheduled full cloud backups are implemented; automated offload remains uninstalled.** The [autonomous checkpoint](reports/DEVELOPMENT_COMPLETION_STATUS.md) implements bounded bundles, resumed downloads, hashes, SQLite receipts, restore, authenticated verification and non-executable retention eligibility, and replays an actual 89-capture transferred partition. Cloud archive access and an ACL-protected SSH key are available. The separate full-backup command has passed download and restore verification, runs through the installed Windows task and records verified backup receipts on the VM. Partition-offload receipt transactions, cleanup journals, a final long-term destination and installation of the offload worker remain future work. This is independent of local weather analysis.
 
 - Install the Windows archive downloader, receipt protocol, cloud archive catalog, and pressure-triggered cleanup. Keep detailed historic maps available in the cloud while capacity permits.
 - Exercise offline/resumed downloads, a full disk, corrupted parts, duplicate receipts, protected-year boundaries, and restoration of a transferred historical map before enabling cloud cleanup.
@@ -521,13 +526,13 @@ Future optional additions should be driven by use: one-minute storm collection, 
 
 ## 11. Open decisions and questions for the owner
 
-The selected VM, public-IP access, five-minute outage cadence, 30-minute weather refresh, evidence retention and dashboard scope are settled. Cloud account access is configured and deployment is complete. The former PC trial is stopped; its old deadline is not a future acceptance instruction. Both outage-event and peak-customer per-capita measures are implemented.
+The selected VM, public-IP access, five-minute outage cadence, 30-minute weather refresh, evidence retention, dashboard scope and daily/login PC backup schedule are settled. Cloud account access is configured and deployment is complete. External monitoring is prepared for later and remains unconfigured by choice. The former PC trial is stopped; its old deadline is not a future acceptance instruction. Both outage-event and peak-customer per-capita measures are implemented.
 
 | Decision | Needed now? | Default or trigger |
 | --- | --- | --- |
 | Specific storms or weather categories to prioritize | Optional | Expand only when independent coverage and suitable references support another case. |
 | Domain name | Optional | Continue using the verified public-IP HTTPS origin. |
-| Recurring backup destination/schedule and external alerts | For further operational automation | Current backups are on demand; health checks log on the VM. |
+| External alert delivery | Optional; deferred by choice | Heartbeat integration is prepared but has no configured endpoint/account. Health checks log on the VM; daily/login PC backups are already installed. |
 | Final long-term archive directory, disk budget and second copy | Before automatic offload installation | Current verified backups use `data/deployment/backups`; the provisional long-term archive is `C:\Developer\mlgw-outage-scraper\archive`. Recheck destination capacity at that stage. |
 | Additional paid storage or backup products | Only if needed and requested | The selected $12/month VM is active; further paid products are not automatically enabled. |
 

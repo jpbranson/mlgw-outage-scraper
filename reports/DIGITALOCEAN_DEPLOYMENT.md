@@ -47,9 +47,11 @@ Validation completed:
 - Firewall exposes SSH, HTTP and HTTPS only. Dashboard and Caddy administration listeners remain on loopback. SSH password authentication is disabled.
 - A downloaded cloud backup was fully verified and restored offline in Linux: **6,315 files**, **1,723 attempts**, **1,636 snapshots**, SQLite integrity `ok`.
 
-At the initial operating check, the VM had about **44 GiB free disk space** and **1.2 GiB available RAM**. Measured service memory peaks were approximately 97 MiB for the dashboard, 48 MiB for the collector and 277 MiB for weather. These are observed light-load measurements, not a stress or uptime guarantee. Browser automation was unavailable in this session; the public HTTP verifier exercised the already-built dashboard endpoints.
+At the initial operating check, the VM had about **44 GiB free disk space** and **1.2 GiB available RAM**. Measured service memory peaks were approximately 97 MiB for the dashboard, 48 MiB for the collector and 277 MiB for weather. These are observed light-load measurements, not a stress or uptime guarantee. Browser automation was unavailable at the initial handoff; the later audit release passed the four desktop/phone Playwright cases recorded above.
 
 **Documentation audit, September 22 at 16:26 UTC:** read-only checks confirmed that the dashboard, both collectors, Caddy, health timer and certificate timer were active; application services and timers were enabled at boot. Public health was `ok` with the 16:25:22 UTC capture, and the private health check reported no issues. About 44 GiB remained free. This audit did not restart services or rerun the deployment tests.
+
+**Documentation recheck, September 22 at 11:11 PM CDT / September 23 at 04:11 UTC:** the active release resolved to `/opt/mlgw/releases/2026-09-23T03-49-04-921Z`; the dashboard, outage collector, weather service and health timer were active. Private health at 04:11:24 UTC was `ok`, with no issues, 46,582,018,048 free disk bytes and the 03:54:45 UTC verified backup receipt. External monitoring reported `configured=false`. Task Scheduler confirmed the installed daily/login backup task, last result `0` and next run September 23 at 10 AM Central. These were read-only checks; no services, schedules or backups were changed.
 
 ## September 22 archive compatibility repair
 
@@ -59,7 +61,7 @@ The repair preserves an existing gzip file when bounded decompression matches th
 
 The active release's `src/durable/archive.mjs` was patched at **10:14 PM CDT on September 22 (03:14 UTC September 23)** and only the outage collector was restarted. The pending 4:10 PM capture was recovered with verified detail. Fresh captures published at **10:14:30 PM** and the next scheduled **10:15:01 PM CDT**. All **30 public HTTPS checks passed**, and the private health check returned `ok` with no issues. The conflicting archived gzip retained its exact checksum. The approximately six-hour interval without observations remains a collection gap; recovery does not invent missing captures.
 
-The deployment record, Linux test log, prior module and prior collector state are retained in `/opt/mlgw/hotfixes/2026-09-23-archive-gzip/`. The installed module's SHA-256 is `8900a042322f99bf4052d8de1af70a4cbee3ec836bac3789d5f1c55b2eaa9398`. The prior module is `archive.mjs.before`; no canonical archive objects were replaced or removed.
+The deployment record, Linux test log, prior module and prior collector state are retained in `/opt/mlgw/hotfixes/2026-09-23-archive-gzip/`. The module installed by that repair had SHA-256 `8900a042322f99bf4052d8de1af70a4cbee3ec836bac3789d5f1c55b2eaa9398`. The prior module is `archive.mjs.before`; no canonical archive objects were replaced or removed. The subsequent audit release is the current deployment.
 
 ## Operating commands
 
