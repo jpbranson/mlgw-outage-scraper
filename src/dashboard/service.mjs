@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { join } from 'node:path';
 import { Archive } from '../durable/archive.mjs';
-import { spatialHistory, SpatialLimitError } from './spatial.mjs';
+import { spatialHistory, SpatialLimitError, exactLocation } from './spatial.mjs';
 import { CensusAreas } from './census.mjs';
 import { logError } from '../runtime/logging.mjs';
 
@@ -117,7 +117,7 @@ export class DashboardService {
     const rangeParams = new URLSearchParams(params); rangeParams.set('resolution', 'daily');
     const { from, to } = period(rangeParams, this.now());
     const geography = params.get('geography') || 'grid';
-    if (!['grid', 'block-group'].includes(geography)) throw new RequestError('Choose grid or block-group geography.');
+    if (!['grid', 'block-group', 'location'].includes(geography)) throw new RequestError('Choose grid, block-group or location geography.');
     signal?.throwIfAborted();
     const generation = this.db.prepare('PRAGMA data_version').get().data_version;
     const cacheKey = JSON.stringify([generation, from, to, geography]), cached = this.spatialCache.get(cacheKey);
@@ -128,8 +128,9 @@ export class DashboardService {
     try {
       const history = await spatialHistory({ rows: this.rows(from, to), from, to, signal,
         readDetail: row => this.mapDetail(row), comparable: (a, b) => this.comparable(a, b),
-        ...(census ? { locate: coordinates => census.locate(coordinates) } : {}) });
-      const data = census ? census.normalize(history) : history;
+        ...(census ? { locate: coordinates => census.locate(coordinates) } : geography === 'location' ? { locate: exactLocation } : {}) });
+      const data = census ? census.normalize(history) : geography === 'location' ? { ...history, geography,
+        meaning: 'Exact reported coordinates, as published. Source records are distinct source outage IDs; repeated polls count once. Different records at one point show reuse of a reporting location, not a shared cause, equipment or customer group. Missing history is unknown.' } : history;
       if (this.spatialCache.size >= 4) this.spatialCache.delete(this.spatialCache.keys().next().value);
       this.spatialCache.set(cacheKey, { at: this.now(), data });
       return data;

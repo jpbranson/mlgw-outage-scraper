@@ -24,7 +24,7 @@ export function decodePng(body) {
   check(header&&ended&&compressed.length,'Incomplete PNG');
   const width=header.readUInt32BE(0),height=header.readUInt32BE(4),depth=header[8],type=header[9];
   check(width>0&&height>0&&width*height<=70000000&&header[10]===0&&header[11]===0&&header[12]===0,'Unsupported PNG geometry/encoding');
-  const bpp=type===3&&depth===8?1:type===0&&depth===16?2:type===6&&depth===8?4:0;
+  const bpp=type===3&&depth===8?1:type===0&&depth===16?2:type===0&&depth===8?1:type===6&&depth===8?4:0;
   check(bpp>0,'Unsupported PNG pixel type');
   if(type===3)check(palette?.length&&palette.length%3===0,'PNG palette missing');
   const stride=width*bpp,expected=(stride+1)*height;
@@ -91,7 +91,8 @@ export function rainfallSubset(compressed,validAt,bbox=BBOX) {
   check(instant(sourceAt)===instant(validAt),'MRMS time differs from requested endpoint');
   check(s3.length===72&&s3.readUInt16BE(12)===0&&s3[71]===0&&s3[10]===0,'Unsupported MRMS grid template/scan');
   check(s4.length===34&&s4.readUInt16BE(7)===0&&s4[9]===6&&s4[10]===37&&s4.readUInt32BE(18)===0,'Unexpected MRMS product/forecast');
-  check(s5.length===21&&s5.readUInt16BE(9)===41&&s5[19]===16&&s6.length===6&&s6[5]===255,'Unsupported MRMS packing/bitmap');
+  // Template 5.41 stores 8- or 16-bit grayscale PNG values; both decode with the same exact scaling.
+  const bits=s5[19];check(s5.length===21&&s5.readUInt16BE(9)===41&&[8,16].includes(bits)&&s6.length===6&&s6[5]===255,'Unsupported MRMS packing/bitmap');
   const basic=s3.readUInt32BE(38),div=s3.readUInt32BE(42),unit=basic===0?1e-6:basic/div;
   check(Number.isFinite(unit)&&unit>0,'Invalid GRIB angle unit');
   const grid={width:s3.readUInt32BE(30),height:s3.readUInt32BE(34),x0:signed32(s3,50)*unit,y0:signed32(s3,46)*unit,dx:s3.readUInt32BE(63)*unit,dy:-s3.readUInt32BE(67)*unit};
@@ -99,12 +100,12 @@ export function rainfallSubset(compressed,validAt,bbox=BBOX) {
   let xlast=signed32(s3,59)*unit;if(xlast>180)xlast-=360;
   check(Math.abs(grid.x0+(grid.width-1)*grid.dx-xlast)<1e-5&&Math.abs(grid.y0+(grid.height-1)*grid.dy-signed32(s3,55)*unit)<1e-5,'MRMS endpoint/grid inconsistency');
   check(grid.width*grid.height===s3.readUInt32BE(6)&&grid.width*grid.height===s5.readUInt32BE(5),'MRMS grid point count mismatch');
-  const png=decodePng(sections[7].subarray(5));check(png.width===grid.width&&png.height===grid.height&&png.type===0,'MRMS PNG/grid mismatch');
+  const png=decodePng(sections[7].subarray(5));check(png.width===grid.width&&png.height===grid.height&&png.type===0&&png.depth===bits,'MRMS PNG/grid mismatch');
   const subset=indices(grid,bbox),reference=s5.readFloatBE(11),binary=signed16(s5,15),decimal=signed16(s5,17);
   check(Number.isFinite(reference)&&Math.abs(binary)<=30&&Math.abs(decimal)<=10,'Unsupported MRMS scaling');
   const values=[],quality=[];
   for(let y=0;y<subset.height;y++)for(let x=0;x<subset.width;x++) {
-    const packed=png.pixels.readUInt16BE(((y+subset.top)*grid.width+x+subset.left)*2),value=(reference+packed*2**binary)*10**(-decimal);
+    const i=(y+subset.top)*grid.width+x+subset.left,packed=bits===16?png.pixels.readUInt16BE(i*2):png.pixels[i],value=(reference+packed*2**binary)*10**(-decimal);
     const missing=Math.abs(value+1)<1e-6,noCoverage=Math.abs(value+3)<1e-6;
     check(missing||noCoverage||(Number.isFinite(value)&&value>=0&&value<=2000),'Unrecognized rainfall value');
     values.push(missing||noCoverage?null:Number(value.toFixed(6)));quality.push(missing?'missing':noCoverage?'no-coverage':'estimate');

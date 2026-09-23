@@ -70,7 +70,9 @@ checks.push('legacy_assets_catalog_series_replay_csv_and_exact_polygons', 'legac
 const comparisonPage = await get('/legacy.html?view=comparisons', { headers });
 assert.equal(comparisonPage.status, 200); assert.match(await comparisonPage.text(), /Weather &amp; observed outages/);
 const comparisonCatalog = await (await get('/api/legacy/catalog?view=comparisons', { headers })).json();
-assert.deepEqual(comparisonCatalog.entries.map(e=>e.id).sort(),['cold-2022','heat-2023','june-2023','september-2024']);
+// Expected cases come from the locally prepared catalogs that were published, not a fixed count.
+const expectedCases=['data/comparisons/catalog.json','data/comparisons/conditions/catalog.json'].flatMap(path=>JSON.parse(readFileSync(path,'utf8')).entries.map(e=>e.id)).sort();
+assert.deepEqual(comparisonCatalog.entries.map(e=>e.id).sort(),expectedCases);
 assert.deepEqual(comparisonCatalog, await (await fetch('http://127.0.0.1:4173/api/legacy/catalog?view=comparisons')).json());
 for (const entry of comparisonCatalog.entries) for (const lag of [0,1,3]) {
   const params = new URLSearchParams({ view: 'comparison', id: entry.id, lag: String(lag) });
@@ -85,7 +87,7 @@ for (const entry of comparisonCatalog.entries) for (const lag of [0,1,3]) {
   assert.ok(reference.comparison.pairs.filter(p=>p.included).every(p=>p.caseCapture&&p.referenceCapture&&(detail.kind==='temperature'
     ? Number.isFinite(p.referenceTemperatureC)&&(detail.family==='winter'?p.referenceTemperatureC>=0:p.referenceTemperatureC<32)&&p.referenceWindMs<10&&p.referencePrecipitationMm!==null&&p.referencePrecipitationMm<.1
     : p.referenceRainMm<.1&&p.referenceWindMs<10)));
-  if(detail.id==='cold-2022')assert.ok(detail.comparison.geography.geojson.features.length>0);
+  if(['cold-2022','heat-june-2022'].includes(detail.id))assert.ok(detail.comparison.geography.geojson.features.length>0);
   const csvPath = '/api/legacy/export.csv?' + params;
   const csv = await (await get(csvPath, { headers })).text();
   assert.equal(csv, await (await fetch('http://127.0.0.1:4173' + csvPath)).text());
@@ -97,7 +99,7 @@ for (const entry of comparisonCatalog.entries) for (const lag of [0,1,3]) {
 }
 assert.equal((await get('/data/comparisons/catalog.json', { headers })).status, 404);
 assert.equal((await get('/api/legacy/series?view=comparison&id=june-2023&lag=2', { headers })).status, 400);
-checks.push('comparison_page_four_cases_all_lags_exact_json_csv_geometry_and_coverage');
+checks.push('comparison_page_all_prepared_cases_all_lags_exact_json_csv_geometry_and_coverage');
 checks.push('matched_references_all_lags_exact_pairs_csv_and_low_weather_masks');
 const http = await fetch(origin.replace('https:', 'http:') + '/', { redirect: 'manual', signal: AbortSignal.timeout(15000) });
 assert.ok([301, 302, 307, 308].includes(http.status)); assert.match(http.headers.get('location'), /^https:/);

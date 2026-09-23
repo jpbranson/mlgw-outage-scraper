@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync,mkdtempSync,mkdirSync,writeFileSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
-import {temperatureHours,temperatureCondition,matchTemperature,temperatureGeography} from '../src/weather/temperature-comparisons.mjs';
+import {temperatureHours,temperatureCondition,matchTemperature,temperatureGeography,temperatureText} from '../src/weather/temperature-comparisons.mjs';
 import {ComparisonService} from '../src/dashboard/comparisons.mjs';
 import {sha256} from '../src/weather/objects.mjs';
 const policy=JSON.parse(readFileSync(new URL('../config/weather-reference-policy.json',import.meta.url))),HOUR=3600000;
@@ -45,4 +45,14 @@ test('temperature publications stay separate, verified and downloadable through 
   writeFileSync(join(root,'conditions',entry.path),bytes);writeFileSync(join(root,'conditions','catalog.json'),JSON.stringify({version:d.version,analysisVersion:'temperature-comparison-v1',entries:[entry]}));
   const s=new ComparisonService(root),p=new URLSearchParams('id=cold&lag=0');assert.equal(s.catalog().entries.length,1);assert.match(s.csv(p),/temperatureC/);p.set('table','reference');assert.match(s.csv(p),/caseTemperatureC/);
   writeFileSync(join(root,'conditions',entry.path),'broken');assert.throws(()=>s.series(p),/verified/);
+});
+test('temperature case names and confounder notes come only from the configured episode',()=>{
+  const candidates=JSON.parse(readFileSync(new URL('../config/weather-candidates.json',import.meta.url))).candidates,byId=Object.fromEntries(candidates.map(c=>[c.id,c]));
+  const heat=temperatureText(byId['heat-2023']),other=temperatureText(byId['heat-june-2022']),cold=temperatureText(byId['cold-2022']);
+  assert.equal(heat.name,'June 29–July 1, 2023 · Heat');assert.equal(cold.name,'December 22–24, 2022 · Cold');assert.equal(other.name,'June 13–15, 2022 · Heat');
+  assert.match(heat.interpretation.at(-1),/June 25 storm/);for(const t of [other,cold,temperatureText(byId['heat-august-2024'])])assert.ok(t.interpretation.every(x=>!/June 25/.test(x)));
+  assert.ok(heat.interpretation.every(x=>!/One independent case/.test(x)));assert.equal(other.interpretation.length,heat.interpretation.length-1);
+  assert.throws(()=>temperatureText({...byId['heat-june-2022'],name:undefined}),/name/);assert.throws(()=>temperatureText({...byId['heat-june-2022'],notes:[1]}),/notes/);
+  assert.throws(()=>temperatureText({...byId['wind-march-2023']}),/notes/);
+  for(const c of candidates)if(['winter','heat'].includes(c.family)&&c.name)assert.doesNotThrow(()=>temperatureText(c));
 });

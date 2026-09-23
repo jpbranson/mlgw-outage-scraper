@@ -1,0 +1,11 @@
+{
+  "name": "Calendar-matched reference for March 2023 high wind",
+  "reportId": "rainfall-reference-wind-march-2023",
+  "from": "2023-02-17T00:00:00Z",
+  "to": "2023-02-20T00:00:00Z",
+  "hoursPerBatch": 24,
+  "periodHours": [
+    72
+  ],
+  "purpose": "Reference weather selected using calendar, capture timestamps and station weather only. Outage levels are not selection criteria. Regional rainfall and paired-hour eligibility require separate verification."
+}

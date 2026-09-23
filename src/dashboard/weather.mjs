@@ -87,7 +87,7 @@ export class WeatherService {
   periods(params) {
     if([...params.keys()].length)throw new RequestError('Prepared periods take no query parameters.',400);
     return {periods:this.catalog().entries.filter(e=>e.product==='rainfall-period').sort((a,b)=>instant(b.validAt)-instant(a.validAt)||a.hours-b.hours)
-      .map(e=>({id:e.sha256,from:e.intervalStart,to:e.intervalEnd,hours:e.hours}))};
+      .map(e=>({id:e.sha256,from:e.intervalStart,to:e.intervalEnd,hours:e.hours,rolling:Boolean(e.rolling)}))};
   }
   period(params) {
     const id=params.get('id');
@@ -95,7 +95,7 @@ export class WeatherService {
     const e=this.catalog().entries.find(e=>e.product==='rainfall-period'&&e.sha256===id);
     if(!e)throw new RequestError('Prepared rainfall period not found.',404);
     const d=this.read(e);
-    return {id,from:e.intervalStart,to:e.intervalEnd,hours:e.hours,imageUrl:`/api/weather/image/${id}`,bbox:d.bbox,legend:d.legend,units:d.units,
+    return {id,from:e.intervalStart,to:e.intervalEnd,hours:e.hours,rolling:Boolean(e.rolling),imageUrl:`/api/weather/image/${id}`,bbox:d.bbox,legend:d.legend,units:d.units,
       grid:d.grid,values:d.values,hoursPerCell:d.hoursPerCell,summary:d.summary,areaSummary:d.areaSummary,
       completeBlockGroups:d.completeBlockGroups,blockGroupCount:d.blockGroupCount,provider:d.provider,sourceUrl:d.sourceUrl,qualityFlags:d.qualityFlags};
   }

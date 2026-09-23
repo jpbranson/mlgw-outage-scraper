@@ -4,7 +4,7 @@ import { pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { WeatherCache } from '../src/weather/cache.mjs';
 import { publishWeather } from '../src/weather/publish.mjs';
-import { maintenanceRequests, pruneRollingCache, directoryBytes } from '../src/weather/maintenance.mjs';
+import { maintenanceRequests, pruneRollingCache, directoryBytes, publishRollingRainfall } from '../src/weather/maintenance.mjs';
 import { clearDeadLock, processLock } from '../src/runtime/process-lock.mjs';
 import { writeJsonAtomic } from '../src/pilot-io.mjs';
 
@@ -31,9 +31,12 @@ try {
         cache = new WeatherCache(join(root, 'live-cache'), { limits: { cacheBytes: rollingBudget, minimumFreeBytes: 5000000000 } });
         const now = Date.now(), retention = pruneRollingCache(cache, { now });
         const outcomes = await publishWeather(cache, maintenanceRequests(now), { offline: false });
-        state.lastRun = { at: new Date(now).toISOString(), retention, outcomes, requests: cache.requests, downloadBytes: cache.downloadBytes, evidenceBytes, rollingBytes: cache.used, totalCap };
+        // Derived display totals only; a failure here leaves the hourly frames and outage collection untouched.
+        let rollingRainfall;
+        try { rollingRainfall = publishRollingRainfall(cache); } catch (error) { rollingRainfall = { error: error.message }; }
+        state.lastRun = { at: new Date(now).toISOString(), retention, outcomes, rollingRainfall, requests: cache.requests, downloadBytes: cache.downloadBytes, evidenceBytes, rollingBytes: cache.used, totalCap };
         state.lastError = null;
-        state.status = outcomes.some(o => ['failed', 'restricted', 'provider-paused', 'rate-limited'].includes(o.status)) ? 'degraded' : 'ok';
+        state.status = rollingRainfall.error || outcomes.some(o => ['failed', 'restricted', 'provider-paused', 'rate-limited'].includes(o.status)) ? 'degraded' : 'ok';
         if (outcomes.some(o => o.status === 'restricted')) state.stopReason = 'source_restricted';
       } catch (error) { state.lastError = error.message; state.status = 'degraded'; }
       finally { cache?.close(); state.phase = 'idle'; }

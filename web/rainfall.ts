@@ -1,5 +1,5 @@
 import L from 'leaflet';
-type Range={id:string;from:string;to:string;hours:number};
+type Range={id:string;from:string;to:string;hours:number;rolling?:boolean};
 type Period=Range&{bbox:[number,number,number,number];imageUrl:string;legend:{label:string;color:string}[];
   grid:{width:number;height:number;x0:number;y0:number;dx:number;dy:number};values:(number|null)[];hoursPerCell:number[];
   summary:{availableHours:number;completeCells:number;cells:number;maxMm:number|null};
@@ -9,7 +9,7 @@ const put=(id:string,value:string)=>{el(id).textContent=value;};
 const date=(at:string)=>new Intl.DateTimeFormat('en-US',{timeZone:'America/Chicago',year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit',timeZoneName:'short'}).format(new Date(at));
 async function read<T>(url:string):Promise<T>{const r=await fetch(url,{signal:AbortSignal.timeout(10000)});if(!r.ok)throw Error('Prepared rainfall is unavailable. Retry shortly.');return r.json();}
 export class RainfallControls {
-  private active=false;private ticket=0;private periods:Range[]=[];private data:Period|null=null;
+  private active=false;private chosen=false;private ticket=0;private periods:Range[]=[];private data:Period|null=null;
   private image?:L.ImageOverlay;private border?:L.Rectangle;
   constructor(private map:L.Map,private onRange:(range:Range|null)=>void) {
     map.createPane('rainfall-period');map.getPane('rainfall-period')!.style.zIndex='350';map.getPane('rainfall-period')!.style.pointerEvents='none';
@@ -28,6 +28,8 @@ export class RainfallControls {
     el<HTMLSelectElement>('rainfall-ending').disabled=el<HTMLSelectElement>('rainfall-hours').disabled=true;
     try {
       const {periods}=await read<{periods:Range[]}>('/api/weather/periods');if(ticket!==this.ticket||!this.active)return;
+      // Open on the newest prepared or rolling period; later visits keep the viewer's length.
+      if(!this.chosen&&periods.length){el<HTMLSelectElement>('rainfall-hours').value=String(periods[0].hours);this.chosen=true;}
       this.periods=periods;this.options();el<HTMLSelectElement>('rainfall-hours').disabled=false;
       await this.load();
     }catch(error){if(ticket===this.ticket&&this.active){put('rainfall-status',(error as Error).message);this.onRange(null);}}
@@ -35,7 +37,7 @@ export class RainfallControls {
   private options() {
     const hours=Number(el<HTMLSelectElement>('rainfall-hours').value),select=el<HTMLSelectElement>('rainfall-ending'),priorTo=this.periods.find(p=>p.id===select.value)?.to;
     select.replaceChildren();
-    for(const range of this.periods.filter(p=>p.hours===hours)){const option=document.createElement('option');option.value=range.id;option.textContent=date(range.to);select.append(option);}
+    for(const range of this.periods.filter(p=>p.hours===hours)){const option=document.createElement('option');option.value=range.id;option.textContent=`${date(range.to)}${range.rolling?' · rolling':''}`;select.append(option);}
     const matching=this.periods.find(p=>p.hours===hours&&p.to===priorTo);
     if(matching)select.value=matching.id;
     select.disabled=!select.options.length;
@@ -54,7 +56,7 @@ export class RainfallControls {
       const overlay=L.imageOverlay(data.imageUrl,[[s,w],[n,e]],{pane:'rainfall-period',opacity:Number(el<HTMLInputElement>('rainfall-opacity').value)/100,interactive:false});this.image=overlay;
       overlay.on('error',()=>{if(ticket===this.ticket&&this.image===overlay){this.clear();put('rainfall-status','Rainfall image unavailable. The selected outage history remains usable.');}});overlay.addTo(this.map);
       this.border=L.rectangle([[s,w],[n,e]],{pane:'rainfall-period',color:'#555',weight:1,dashArray:'3 4',fill:false,interactive:false}).addTo(this.map);
-      put('rainfall-status',`${data.hours}-hour estimated rainfall · ${date(data.from)} – ${date(data.to)}`);
+      put('rainfall-status',`${data.hours}-hour estimated rainfall · ${date(data.from)} – ${date(data.to)}${data.rolling?' · rolling display total, recalculated hourly and kept about one day':''}`);
       const a=data.areaSummary,pct=(n:number)=>`${(n*100).toFixed(1)}%`;
       put('rainfall-coverage',`${data.summary.availableHours}/${data.hours} hourly files · ${pct(a.areaTimeCoverage)} area/time coverage · ${pct(a.completePeriodAreaFraction)} area with a complete total. Mean across the outlined area: ${a.meanMm===null?'unavailable':`${a.meanMm.toFixed(1)} mm`}. Tap the map for a native cell.`);
       const legend=el('rainfall-legend');legend.replaceChildren();legend.hidden=false;

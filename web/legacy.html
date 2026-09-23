@@ -23,9 +23,9 @@
       <div class="map-wrap"><div id="map" aria-label="Legacy geographic grid polygons"></div><div id="map-notice" class="map-notice" role="status">Select a capture to inspect its grid coverage.</div></div>
       <p id="grid-summary" class="muted map-key">Missing geometry is unknown.</p>
       <div class="history-controls">
-        <div class="history-heading"><label for="archive-date">Replay date (UTC)</label><input type="date" id="archive-date" disabled></div>
+        <div class="history-heading"><label for="archive-date">Replay date (UTC)</label><input type="date" id="archive-date" disabled><label class="play-speed">Speed <select id="play-speed"><option value="4000">Slow</option><option value="2000" selected>Normal</option><option value="1000">Fast</option></select></label></div>
         <label for="legacy-capture" class="muted">Observation (Central time)</label><select id="legacy-capture" class="legacy-replay-select" disabled><option>No observations loaded</option></select>
-        <div class="slider-row"><button id="previous" aria-label="Previous legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Legacy capture" disabled><button id="next" aria-label="Next legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+        <div class="slider-row"><button id="play" aria-label="Play replay" aria-pressed="false" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path id="play-icon" d="M7 4.5v15l12-7.5z"/></svg></button><button id="previous" aria-label="Previous legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Legacy capture" disabled><button id="next" aria-label="Next legacy capture" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
         <p id="day-coverage" class="muted" role="status"></p>
       </div>
     </section>

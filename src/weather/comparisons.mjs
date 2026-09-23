@@ -7,6 +7,20 @@ const check = (ok, message) => { if (!ok) throw Error(message); };
 const iso = at => new Date(at).toISOString();
 const median = values => { const sorted = [...values].sort((a,b) => a-b), n=sorted.length; return n ? n%2 ? sorted[(n-1)/2] : (sorted[n/2-1]+sorted[n/2])/2 : null; };
 
+// Bounded, fixed plan: each episode is a distinct 72-hour UTC window with its own validated rainfall reports.
+export function validateComparisonPlan(config) {
+  check(config?.version===COMPARISON_VERSION&&Array.isArray(config.episodes)&&config.episodes.length>=1&&config.episodes.length<=8,'Unsupported comparison plan');
+  check(new Set(config.episodes.map(e=>e.id)).size===config.episodes.length,'Duplicate comparison ID');
+  for(const e of config.episodes) {
+    check(/^[a-z0-9-]{1,40}$/.test(e.id??'')&&typeof e.name==='string'&&e.name.length>0&&e.name.length<=80,'Invalid comparison ID');
+    const start=Date.parse(e.from),end=Date.parse(e.to);
+    check(Number.isFinite(start)&&start%HOUR===0&&end-start===72*HOUR,'Comparison episode must contain 72 UTC hours');
+    for(const k of ['rainfallReport','referenceRainfallReport'])check(/^reports\/rainfall-[a-z0-9-]+-validation\.json$/.test(e[k]??''),'Invalid rainfall report path');
+    check(/^[a-z0-9-]{1,40}$/.test(e.eventCase??''),'Invalid event context sample');
+  }
+  return config;
+}
+
 export function outageHours(rows, from, to, maxGapMinutes = 7.5, minimumCoverage = .9) {
   const range = windowUtc(from, to), start=Date.parse(range.from), end=Date.parse(range.to);
   check(start%HOUR===0 && end%HOUR===0 && maxGapMinutes===7.5 && minimumCoverage===.9, 'Unsupported outage comparison policy');
@@ -111,7 +125,7 @@ export function compareEpisode(input, rules) {
       meaning:'Equal-length preceding window, descriptive context only. Rainfall and joint weather coverage have not been prepared for it; it is not a matched dry-weather control.'},
     ...weather,outageHours:outage.hours,byLag:rules.lagHours.map(lag=>conditionGroups(outage.hours,weather.rainfall.hours,weather.wind.hours,lag,rules)),
     spatial:{available:false,reason:outage.summary.gridSnapshots?'Spatial attribution is not part of this regional comparison.':'No verified legacy grid snapshots in this period. Only regional totals are compared; no outage locations are inferred.'},
-    interpretation:['Two selected case studies; hours within a storm are not independent events. Descriptive co-occurrence does not identify outage causes.',
+    interpretation:['Selected case studies; hours within a storm are not independent events. Descriptive co-occurrence does not identify outage causes.',
       'Condition thresholds are analytical cutoffs, not official storm categories. Rain and wind groups overlap and must not be added.',
       'At least six matched hours are required for a group median. Counts, missing hours and sparse groups remain visible.',
       'No new-event frequency or per-capita rates: consolidated totals do not establish event identities or an appropriate population denominator.'],

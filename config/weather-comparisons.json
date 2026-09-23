@@ -28,6 +28,24 @@
       "rainfallReport": "reports/rainfall-francine-2024-validation.json",
       "eventCase": "francine",
       "referenceRainfallReport": "reports/rainfall-reference-september-2024-validation.json"
+    },
+    {
+      "id": "wind-march-2023",
+      "name": "March 3–5, 2023 · High wind",
+      "from": "2023-03-03T00:00:00Z",
+      "to": "2023-03-06T00:00:00Z",
+      "rainfallReport": "reports/rainfall-wind-march-2023-validation.json",
+      "eventCase": "march-wind",
+      "referenceRainfallReport": "reports/rainfall-reference-wind-march-2023-validation.json"
+    },
+    {
+      "id": "storm-aug30-2024",
+      "name": "August 30–September 1, 2024 · Storms",
+      "from": "2024-08-30T00:00:00Z",
+      "to": "2024-09-02T00:00:00Z",
+      "rainfallReport": "reports/rainfall-storm-aug30-2024-validation.json",
+      "eventCase": "august-storm",
+      "referenceRainfallReport": "reports/rainfall-reference-storm-aug30-2024-validation.json"
     }
   ]
 }

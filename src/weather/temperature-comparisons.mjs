@@ -20,6 +20,17 @@ export function temperatureHours(station,from,to) {
       precipitationStatus:precipitation?.status??'missing-report',precipitationMm:precipitation?.value??null};
   });
 }
+// Case names and episode-specific confounders come from the fixed candidate list, never from outcomes.
+export function temperatureText(episode) {
+  const {name,family,notes=[]}=episode??{};
+  requireValue(typeof name==='string'&&name.length>0&&name.length<=80,'Temperature case requires a configured name');
+  requireValue(['winter','heat'].includes(family)&&Array.isArray(notes)&&notes.length<=4&&notes.every(n=>typeof n==='string'&&n.length>0&&n.length<=300),'Invalid temperature case notes');
+  return {name,interpretation:['Airport temperature is regional context. Hourly report minima/maxima are not continuous exposure measurements.',
+    'Below 0°C and at least 32°C are fixed analytical thresholds, not proof of snow, ice accumulation, a heat wave or utility equipment damage. Finalized hazard records are separate context.',
+    'Each case is one episode with one matched reference; cases are not pooled. Six pairs support only a descriptive median. No uncertainty interval or stable geographic ranking is supported.',
+    'The earlier dry/low-wind reference is chosen by calendar, timing and station coverage before reading outage values. Each paired reference exposure also requires known low airport wind and nominal report-hour precipitation, and temperature outside the case threshold.',
+    'No radar rainfall is inferred for these station cases. New events, population rates and complete customer-hours are unavailable from this sparse legacy history.',...notes]};
+}
 export function temperatureCondition(hour,family) {
   requireValue(['winter','heat'].includes(family),'Unsupported temperature family');
   const value=family==='winter'?hour?.minC:hour?.maxC;

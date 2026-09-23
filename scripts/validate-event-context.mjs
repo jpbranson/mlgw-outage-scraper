@@ -7,7 +7,7 @@ import { EVENT_CONTEXT_VERSION, stormEventArchive, stormEventWindow, countyZoneW
 
 const args = process.argv.slice(2), selected = args.find(a => a.startsWith('--case='))?.slice(7);
 if (args.some(a => a !== '--download' && a !== `--case=${selected}`) || (selected !== undefined && !EVENT_SAMPLES.some(s => s.name === selected)))
-  throw Error('Usage: node scripts/validate-event-context.mjs [--download] [--case=wet|dry|winter|heat|francine|current]');
+  throw Error(`Usage: node scripts/validate-event-context.mjs [--download] [--case=${EVENT_SAMPLES.map(s => s.name).join('|')}]`);
 const samples = EVENT_SAMPLES.filter(s => !selected || s.name === selected), cache = new WeatherCache('data/weather/cache');
 const report = { checkedAt: new Date().toISOString(), processingVersion: EVENT_CONTEXT_VERSION,
   mode: args.includes('--download') ? 'download' : 'offline', complete: false, samples: [],

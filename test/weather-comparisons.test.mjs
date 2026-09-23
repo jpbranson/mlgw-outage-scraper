@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { outageHours, windHours, conditionGroups, COMPARISON_VERSION } from '../src/weather/comparisons.mjs';
+import { outageHours, windHours, conditionGroups, validateComparisonPlan, COMPARISON_VERSION } from '../src/weather/comparisons.mjs';
+import { EVENT_SAMPLES } from '../src/weather/event-samples.mjs';
 import { ComparisonService } from '../src/dashboard/comparisons.mjs';
 import { createDashboardServer } from '../src/dashboard/server.mjs';
 import { sha256 } from '../src/weather/objects.mjs';
@@ -73,4 +74,16 @@ test('comparison publications enforce checksums, IDs, lag bounds and read-only e
   assert.equal((await fetch(base+'/api/legacy/series?'+params,{method:'POST'})).status,405);
   writeFileSync(join(root,entry.path),Buffer.alloc(bytes.length));assert.throws(()=>service.series(params),e=>e.status===503);
   assert.equal((await fetch(base+'/api/legacy/series?'+params)).status,503);
+});
+test('comparison plan accepts the fixed episode list and rejects duplicates, bad windows and unbounded plans',()=>{
+  const config=JSON.parse(readFileSync(new URL('../config/weather-comparisons.json',import.meta.url)));validateComparisonPlan(config);
+  assert.deepEqual(config.episodes.map(e=>e.id),['june-2023','september-2024','wind-march-2023','storm-aug30-2024']);
+  for(const e of config.episodes){const sample=EVENT_SAMPLES.find(s=>s.name===e.eventCase);assert.ok(sample,e.id);assert.ok(Date.parse(sample.from)>=Date.parse(e.from)&&Date.parse(sample.to)<=Date.parse(e.to));}
+  const bad=f=>{const c=structuredClone(config);f(c);return c;};
+  assert.throws(()=>validateComparisonPlan(bad(c=>c.episodes.push(c.episodes[0]))),/Duplicate/);
+  assert.throws(()=>validateComparisonPlan(bad(c=>{c.episodes[0].to='2023-06-27T01:00:00Z';})),/72 UTC hours/);
+  assert.throws(()=>validateComparisonPlan(bad(c=>{c.episodes[0].rainfallReport='../secret.json';})),/report path/);
+  assert.throws(()=>validateComparisonPlan(bad(c=>{c.episodes=[];})),/plan/);
+  assert.throws(()=>validateComparisonPlan(bad(c=>{c.episodes=Array.from({length:9},(_,i)=>({...c.episodes[0],id:'case-'+i}));})),/plan/);
+  assert.throws(()=>validateComparisonPlan(bad(c=>{c.episodes[1].id='../x';})),/ID/);
 });

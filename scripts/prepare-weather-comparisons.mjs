@@ -1,18 +1,18 @@
-// Offline publication of two bounded, reproducible case studies.
+// Offline publication of a small, fixed set of bounded, reproducible case studies.
 import { readFileSync, writeFileSync, mkdirSync, renameSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { WeatherCache, sha256 } from '../src/weather/cache.mjs';
 import { BBOX, sourceRequest } from '../src/weather/sources.mjs';
 import { stationSubset } from '../src/weather/decode.mjs';
 import { stationQuality } from '../src/weather/station-quality.mjs';
-import { compareEpisode, summarizeWeather, outageHours, COMPARISON_VERSION } from '../src/weather/comparisons.mjs';
+import { compareEpisode, summarizeWeather, outageHours, validateComparisonPlan, COMPARISON_VERSION } from '../src/weather/comparisons.mjs';
 import { matchReference, validateReferencePolicy } from '../src/weather/references.mjs';
 import { LegacyService } from '../src/dashboard/legacy.mjs';
 import { WeatherService } from '../src/dashboard/weather.mjs';
 
 if(process.argv.length!==2)throw Error('Usage: node scripts/prepare-weather-comparisons.mjs (offline only)');
 const configBytes=readFileSync('config/weather-comparisons.json'), config=JSON.parse(configBytes);
-if(config.version!==COMPARISON_VERSION||config.episodes.length!==2)throw Error('Unsupported comparison plan');
+validateComparisonPlan(config);
 const root='data/comparisons', cacheRoot='data/weather/cache', legacyRoot='data/legacy/dashboard';
 const legacyCatalogBytes=readFileSync(join(legacyRoot,'catalog.json')),legacyCatalog=JSON.parse(legacyCatalogBytes);
 const policyBytes=readFileSync(config.referencePolicy),policy=JSON.parse(policyBytes);validateReferencePolicy(policy);
@@ -103,7 +103,7 @@ try {
         referenceRain:refWeather.rainfall.hours,referenceWind:refWeather.wind.hours,lagHours},policy)),
       limitations:['Dates were screened using calendar, capture timing and station weather only; no outage counts entered selection.',
         'Only reference hours with regional rain below 0.1 mm and airport sustained wind below 10 m/s enter the paired summary. Low rain is not proof of dry weather everywhere.',
-        'A 21- or 28-day separation does not control vegetation, maintenance, heat, demand, prior storms, unmeasured weather or outage carryover. These are descriptive reference contrasts, not causal estimates.',
+        'A 7- to 28-day separation does not control vegetation, maintenance, heat, demand, prior storms, unmeasured weather or outage carryover. These are descriptive reference contrasts, not causal estimates.',
         'Each side contributes one timed snapshot per included hour. This differs from the hourly peaks above. All excluded pairs and exact capture anchors remain downloadable.']};
     const output=publish({...result,provenance:{...result.provenance,inputBundle:bundle}});
     entries.push({id:episode.id,name:episode.name,from:result.from,to:result.to,...output});

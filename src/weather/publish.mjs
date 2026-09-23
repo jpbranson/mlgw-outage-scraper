@@ -5,6 +5,8 @@ import {decodeMetar} from './metar.mjs';
 import {displayImage,DISPLAY_VERSION} from './display.mjs';
 import {sourceRequest} from './sources.mjs';
 
+// The small native subset lets verified hourly frames be summed later without re-decoding the CONUS original.
+export const rainfallNumeric=native=>Object.fromEntries(['processingVersion','product','units','validAt','intervalStart','intervalEnd','crs','earthShapeCode','grid','sourceTables','values','quality'].map(k=>[k,native[k]]));
 export async function publishWeather(cache,requests,{offline=true}={}) {
   let catalog={version:1,entries:[]};
   try{catalog=JSON.parse(readFileSync(join(cache.root,'published/catalog.json'),'utf8'));}catch(e){if(e.code!=='ENOENT')throw e;}
@@ -25,6 +27,7 @@ export async function publishWeather(cache,requests,{offline=true}={}) {
       } else if(request.product==='rainfall') {
         const native=rainfallSubset(raw,request.validAt);data=displayImage(native,'rainfall');
         data.intervalStart=native.intervalStart;data.intervalEnd=native.intervalEnd;data.summary=native.summary;
+        data.numeric=rainfallNumeric(native);
       } else if(request.product==='metar')data=decodeMetar(raw,request);
       else throw Error('Unsupported display product');
       const derived=cache.derived(m,{...data,validAt:request.validAt,provider:request.provider,sourceUrl:request.url,retrievedAt:m.retrievedAt});

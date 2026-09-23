@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { spatialHistory, locationCell, SpatialLimitError } from '../src/dashboard/spatial.mjs';
+import { spatialHistory, locationCell, exactLocation, SpatialLimitError } from '../src/dashboard/spatial.mjs';
 
 const base = Date.parse('2026-09-16T12:00:00Z'), minute = 60000;
 const start = '2026-09-16T11:00:00Z', here = [-89.99, 35.151];
@@ -66,4 +66,15 @@ test('work limits fail explicitly instead of returning a partial historical map'
   await assert.rejects(history([[feature('a'), feature('b')]], { maxObservations: 1 }), SpatialLimitError);
   await assert.rejects(history([[feature('a'), feature('b')]], { maxEvents: 1 }), SpatialLimitError);
   await assert.rejects(history([[feature('a')]], { maxMillis: -1 }), SpatialLimitError);
+});
+test('exact locations keep published coordinates and count distinct source records', async () => {
+  const other = [-89.98, 35.16];
+  const result = await history([[feature('a', 10), feature('b', 30)], [feature('a', 20), feature('c', 5, other)],
+    [feature('a', 25, here, '2026-09-16T11:30:00Z')]], { locate: exactLocation });
+  const shared = result.cells.find(c => c.id === `point:${here[0]},${here[1]}`);
+  assert.deepEqual(shared.center, here); assert.equal(shared.sourceRecords, 2);
+  assert.equal(shared.events, 3); // A source start-time edit is another provisional event, not another record.
+  assert.equal(shared.peakCustomers, 40); assert.equal(shared.observations, 4);
+  assert.equal(result.cells.find(c => c.id === `point:${other[0]},${other[1]}`).sourceRecords, 1);
+  assert.equal(exactLocation([-91, 35.1]), null); assert.equal(exactLocation([-89.99]), null); assert.equal(exactLocation(null), null);
 });

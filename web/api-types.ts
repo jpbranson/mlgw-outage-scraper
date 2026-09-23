@@ -15,7 +15,7 @@ export type Series = { from: number; to: number; resolution: string; points: Poi
 export type SpatialCell = { id: string; center?: [number, number]; events: number | null; uncertainEvents: number;
   peakCustomers: number | null; firstSeenAt: number | null; lastSeenAt: number | null; name?: string;
   population?: number | null; populationMoe?: number | null; populationUncertain?: boolean;
-  eventsPer1000?: number | null; customersPer1000?: number | null };
+  eventsPer1000?: number | null; customersPer1000?: number | null; sourceRecords?: number; observations?: number };
 export type SpatialHistory = { from: number; to: number; cells: SpatialCell[]; geography?: string;
   reportedEvents: number; mappedEvents: number; uncertainEvents: number; captures: number; verifiedCaptures: number;
   unavailableCaptures: number; unmappedObservations: number; firstVerifiedAt: number | null; lastVerifiedAt: number | null;

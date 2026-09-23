@@ -17,10 +17,18 @@
     <nav class="source-navigation" aria-label="Outage source"><a href="/" aria-current="page">Current feed</a><a href="/legacy.html">Legacy archive · 2022–2025</a><a href="/legacy.html?view=comparisons">Weather comparisons</a></nav>
     <div id="error" class="error" role="alert" hidden><span id="error-text"></span><button id="retry">Retry</button></div>
     <div class="map-toolbar">
-      <div class="segmented" aria-label="Map view"><button data-map-view="capture" aria-pressed="true">One capture</button><button data-map-view="history" aria-pressed="false">Heatmap</button><button data-map-view="percapita" aria-pressed="false">Per capita</button><button data-map-view="rainfall" aria-pressed="false">Rainfall</button></div>
-      <label id="map-period-label" hidden>Map period <select id="map-period"><option value="available">Available history</option><option value="0.25">Last 6 hours</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+      <div class="segmented" aria-label="Map view"><button data-map-view="capture" aria-pressed="true">One capture</button><button data-map-view="history" aria-pressed="false">Heatmap</button><button data-map-view="percapita" aria-pressed="false">Per capita</button><button data-map-view="locations" aria-pressed="false">Locations</button><button data-map-view="rainfall" aria-pressed="false">Rainfall</button></div>
+      <label id="map-period-label" hidden>Map period <select id="map-period"><option value="available">Available history</option><option value="0.25">Last 6 hours</option><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option><option value="episode">Custom episode</option></select></label>
       <label id="map-measure-label" hidden>Measure <select id="map-measure"><option value="events">Outage events</option><option value="customers">Peak customers affected</option></select></label>
+      <label id="location-filter-label" hidden>Show <select id="location-filter"><option value="all">All reported locations</option><option value="recurring">Reused by 2+ source records</option></select></label>
     </div>
+    <form id="episode-form" class="episode-form" aria-labelledby="episode-heading" hidden>
+      <span id="episode-heading">Custom episode <span class="muted">(Central time, up to 31 days)</span></span>
+      <label>From <input id="episode-from" type="datetime-local" step="60" required></label>
+      <label>To <input id="episode-to" type="datetime-local" step="60" required></label>
+      <button type="submit">Apply</button><button id="episode-clear" type="button" class="button-quiet">Clear episode</button>
+      <p id="episode-status" class="muted" role="status"></p>
+    </form>
     <section id="spatial-summary" class="spatial-summary" aria-live="polite" hidden><p id="spatial-status"></p><p id="spatial-window" class="muted"></p></section>
     <section id="capture-selection" class="selection-bar" aria-label="Selected capture">
       <div><span id="selection-mode" class="selection-mode">Latest capture</span><h2 id="selected-time">Loading…</h2></div>
@@ -39,6 +47,7 @@
           <label>Rainfall period <select id="rainfall-hours"><option value="24">24 hours</option><option value="48">48 hours</option><option value="72" selected>72 hours</option></select></label>
           <label>Ending <select id="rainfall-ending" aria-label="Rainfall ending time"></select></label>
           <label>Opacity <input id="rainfall-opacity" type="range" min="10" max="90" step="10" value="60" aria-label="Rainfall opacity"><output id="rainfall-opacity-value">60%</output></label>
+          <label><input id="link-maps" type="checkbox" checked> Link map movement</label>
           <button id="rainfall-retry" class="button-quiet">Reload periods</button>
         </div>
         <div id="weather-controls" class="weather-controls">
@@ -46,7 +55,13 @@
           <label id="weather-opacity-label" hidden>Opacity <input id="weather-opacity" type="range" min="10" max="90" step="10" value="60" aria-label="Weather opacity"><output id="weather-opacity-value">60%</output></label>
           <button id="weather-retry" class="button-quiet" hidden>Retry weather</button>
         </div>
-        <div class="map-wrap"><div id="map" aria-label="Approximate reported outage points"></div><div id="map-notice" class="map-notice" role="status" hidden></div></div>
+        <div id="map-pair" class="map-pair">
+          <figure class="map-figure"><figcaption id="rain-map-caption" hidden>Estimated rainfall</figcaption>
+            <div class="map-wrap"><div id="map" aria-label="Approximate reported outage points"></div><div id="map-notice" class="map-notice" role="status" hidden></div></div></figure>
+          <figure id="outage-map-figure" class="map-figure" hidden><figcaption>Reported outage density · same period</figcaption>
+            <div class="map-wrap"><div id="outage-map" aria-label="Current-feed reported outage density during the selected rainfall period"></div><div id="outage-map-notice" class="map-notice" role="status" hidden></div></div></figure>
+        </div>
+        <p id="outage-map-status" class="weather-status" role="status" hidden></p>
         <p id="weather-status" class="weather-status" role="status" hidden></p>
         <div id="weather-legend" class="weather-legend" hidden></div>
         <p id="rainfall-status" class="weather-status" role="status" hidden></p>
@@ -56,8 +71,8 @@
         <div id="map-scale" class="map-scale" hidden></div>
         <p id="census-caption" class="muted census-caption" hidden>Block groups · <a href="https://data.census.gov/table/ACSDT5Y2024.B01003" target="_blank" rel="noopener noreferrer">2020–2024 ACS population</a><br>Approximate location-based rates, not the share of people without power.</p>
         <div id="history-controls" class="history-controls">
-          <div class="history-heading"><label for="archive-date">Replay <span class="muted">(UTC date)</span></label><input type="date" id="archive-date"></div>
-          <div class="slider-row"><button id="previous" aria-label="Previous capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Historical capture" disabled><button id="next" aria-label="Next capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
+          <div class="history-heading"><label for="archive-date">Replay <span class="muted">(UTC date)</span></label><input type="date" id="archive-date"><label class="play-speed">Speed <select id="play-speed"><option value="4000">Slow</option><option value="2000" selected>Normal</option><option value="1250">Fast</option></select></label></div>
+          <div class="slider-row"><button id="play" aria-label="Play replay" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path id="play-icon" d="M7 4.5v15l12-7.5z"/></svg></button><button id="previous" aria-label="Previous capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></button><input id="time-slider" type="range" min="0" max="0" value="0" aria-label="Historical capture" disabled><button id="next" aria-label="Next capture"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button></div>
           <div class="slider-labels"><span id="first-time">—</span><span id="slider-time">No capture selected</span><span id="last-time">—</span></div>
         </div>
         <details id="station-weather" class="station-weather"><summary>Memphis airport weather</summary>
@@ -69,13 +84,14 @@
       </section>
       <section class="panel chart-panel" aria-labelledby="chart-heading">
         <div class="panel-heading"><h2 id="chart-heading">History</h2><span id="chart-zone" class="muted">Central time</span></div>
-        <div class="chart-controls"><div class="segmented" aria-label="Chart measure"><button data-metric="customers" aria-pressed="true">Customers</button><button data-metric="outages" aria-pressed="false">Outages</button></div><div class="segmented range-buttons" aria-label="Chart period"><button data-days="1" aria-pressed="true">24h</button><button data-days="7" aria-pressed="false">7d</button><button data-days="30" aria-pressed="false">30d</button></div></div>
+        <div class="chart-controls"><div class="segmented" aria-label="Chart measure"><button data-metric="customers" aria-pressed="true">Customers</button><button data-metric="outages" aria-pressed="false">Outages</button></div><div class="segmented range-buttons" aria-label="Chart period"><button data-days="1" aria-pressed="true">24h</button><button data-days="7" aria-pressed="false">7d</button><button data-days="30" aria-pressed="false">30d</button><button data-days="episode" aria-pressed="false">Episode</button></div></div>
         <div class="chart-legend"><span><i class="legend-line" aria-hidden="true"></i><span id="series-label">Captured totals</span></span><span><i class="legend-selected" aria-hidden="true"></i>Selected</span></div>
         <div class="chart-wrap"><canvas id="chart" role="img" aria-label="Outage history chart. Select a point to open its map. The replay slider is a keyboard-accessible alternative."></canvas><p id="chart-empty" hidden>No captures in this period</p></div>
         <div class="coverage-label"><span id="coverage">Loading coverage…</span><span class="muted">Gaps = unknown</span></div>
         <div class="chart-footer"><a id="csv" class="export-link" href="/api/export.csv">Download CSV</a><a id="geojson" class="export-link" aria-disabled="true">Map GeoJSON</a></div>
       </section>
       <section id="capture-long-running" class="long-running" aria-label="Long outages"><h2>Outages over 6 hours (<span id="long-count">—</span>)</h2><div id="long-list"><p class="muted">Loading…</p></div></section>
+      <section id="location-ranking" class="long-running" aria-labelledby="location-ranking-heading" hidden><h2 id="location-ranking-heading">Most reused reporting locations</h2><div id="location-list"></div><p id="location-note" class="muted"></p><a id="locations-csv" class="export-link" aria-disabled="true">Download locations CSV</a></section>
     </div>
     <section class="capture-details" aria-label="Capture details">
         <details class="panel data-notes"><summary>Data notes</summary><div class="notes-content">

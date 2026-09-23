@@ -1,0 +1,9 @@
+{
+  "name": "August 30–September 1, 2024 storm case",
+  "reportId": "rainfall-storm-aug30-2024",
+  "from": "2024-08-30T00:00:00Z",
+  "to": "2024-09-02T00:00:00Z",
+  "hoursPerBatch": 24,
+  "contextUrl": "NOAA Storm Events 2024 pinned annual archive; Shelby County / TNZ088 (Thunderstorm Wind, August 30)",
+  "purpose": "Weather-only rainfall for a case selected by fixed event date, capture timestamps and station weather only. No historical outage records are inferred or imported."
+}

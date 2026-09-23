@@ -1,0 +1,9 @@
+{
+  "name": "March 3–5, 2023 high-wind case",
+  "reportId": "rainfall-wind-march-2023",
+  "from": "2023-03-03T00:00:00Z",
+  "to": "2023-03-06T00:00:00Z",
+  "hoursPerBatch": 24,
+  "contextUrl": "NOAA Storm Events 2023 pinned annual archive; Shelby County / TNZ088 (High Wind, March 3)",
+  "purpose": "Weather-only rainfall for a case selected by fixed event date, capture timestamps and station weather only. No historical outage records are inferred or imported."
+}

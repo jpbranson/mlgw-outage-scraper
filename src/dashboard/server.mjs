@@ -98,6 +98,15 @@ export function createDashboardServer(service, { staticRoot, tiles = 'https://ti
           ? await service.spatial(url.searchParams, { signal: controller.signal }) : service.series(url.searchParams), undefined, 'private, max-age=30');
         if (path === '/api/snapshots') return send(200, service.snapshots(url.searchParams.get('date')));
         if (path.startsWith('/api/snapshot/')) return send(200, await service.snapshot(path.slice(14)), undefined, 'private, max-age=60');
+        if (path === '/api/export.csv' && url.searchParams.get('view') === 'locations') {
+          const params = new URLSearchParams({ from: url.searchParams.get('from') ?? '', to: url.searchParams.get('to') ?? '', geography: 'location' });
+          const data = await service.spatial(params, { signal: controller.signal });
+          const lines = ['site_id,longitude,latitude,source_records,provisional_events,uncertain_events,observations,peak_simultaneous_customers,first_observed_utc,last_observed_utc,period_from_utc,period_to_utc,period_time_coverage'];
+          for (const c of data.cells) lines.push([c.id, c.center[0], c.center[1], c.sourceRecords, c.events, c.uncertainEvents, c.observations, c.peakCustomers,
+            new Date(c.firstSeenAt).toISOString(), new Date(c.lastSeenAt).toISOString(), new Date(data.from).toISOString(), new Date(data.to).toISOString(), data.coverage.toFixed(6)].map(v => `"${String(v).replaceAll('"', '""')}"`).join(','));
+          res.setHeader('Content-Disposition', 'attachment; filename="mlgw-reported-locations.csv"');
+          return send(200, lines.join('\r\n') + '\r\n', 'text/csv; charset=utf-8');
+        }
         if (path === '/api/export.csv') {
           const data = service.series(url.searchParams);
           const lines = ['bucket_or_capture_utc,customers,outages,customer_peak_capture_utc,outage_peak_capture_utc,coverage_fraction'];

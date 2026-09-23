@@ -62,7 +62,19 @@ main { max-width: 1680px; padding: 22px 28px 16px; margin: auto; }
 .station-weather summary { cursor: pointer; min-height: 44px; padding: 10px 0; }
 .station-weather p, .station-weather label { margin: 8px 0; }
 .station-chart-wrap { position: relative; height: 200px; margin: 12px 0; }
-#map { height: 520px; background: #fff; z-index: 1; }
+#map, #outage-map { height: 520px; background: #fff; z-index: 1; }
+.map-figure { margin: 0; min-width: 0; }
+.map-figure figcaption { color: var(--muted); margin-bottom: 6px; }
+.map-pair.paired { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; }
+.episode-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 0 0 14px; padding: 10px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.episode-form label { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.episode-form input { min-height: 44px; font: inherit; color: #242424; background: #fff; border: 1px solid #999; border-radius: 0; padding: 6px 8px; max-width: 100%; }
+.episode-form p { width: 100%; }
+.episode-form p:empty { display: none; }
+.play-speed { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.play-speed select { font: inherit; color: inherit; background: #fff; border: 1px solid #999; border-radius: 0; padding: 6px 8px; }
+#play[aria-pressed='true'] { background: #f1f1f1; }
+.map-scale .location-dot { border-radius: 50%; border-color: #000; }
 .leaflet-tile-pane { filter: grayscale(1); }
 .map-notice { position: absolute; z-index: 500; top: 10px; left: 66px; right: 10px; background: #fff; border: 1px solid #985430; padding: 8px 10px; }
 .map-key { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; color: var(--muted); margin-top: 8px; }
@@ -169,11 +181,13 @@ footer { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 0 0; color
 .leaflet-popup-content small { display: block; font-size: inherit; color: var(--muted); margin-top: 10px; }
 .leaflet-container a.leaflet-popup-close-button { width: 32px; height: 32px; font-size: 1.5rem; line-height: 32px; }
 .leaflet-tooltip { font-size: max(1rem, 16px); }
-#map:has(.leaflet-popup) .leaflet-control-zoom { visibility: hidden; }
-@media (min-width: 1440px) { #map { height: 600px; } }
+#map:has(.leaflet-popup) .leaflet-control-zoom, #outage-map:has(.leaflet-popup) .leaflet-control-zoom { visibility: hidden; }
+@media (min-width: 1440px) { #map, #outage-map { height: 600px; } }
 @media (max-width: 960px) {
   .visual-grid { grid-template-columns: minmax(0, 1fr); gap: 28px; }
   .map-panel { grid-row: auto; }
+  .map-pair.paired { grid-template-columns: minmax(0, 1fr); }
+  .map-pair.paired #map, .map-pair.paired #outage-map { height: 380px; }
   .chart-wrap { height: 320px; }
   .long-running { max-width: 620px; }
 }
@@ -187,6 +201,7 @@ footer { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 0 0; color
   .customer-total { width: 100%; }
   .totals p { overflow-wrap: anywhere; }
   #map { height: 420px; }
+  .play-speed { margin-left: 0; }
   .history-controls { margin-top: 14px; }
   .history-heading input { min-width: 0; }
   .chart-wrap { height: 280px; }

@@ -191,3 +191,17 @@ test('per-capita API joins matching Census geometry and population without expos
   assert.doesNotMatch(JSON.stringify(data), /OUT_CAUSE|THIS MUST STAY PRIVATE/);
   query.set('geography', 'arbitrary'); assert.equal((await fetch(`${url}/api/series?${query}`)).status, 400);
 });
+test('location API and CSV use exact published points and distinct source records', async t => {
+  const { add, service, dir } = setup(t); add('a', 0, 10); add('b', 5, 20);
+  const url = await serve(t, service, dir), query = params(); query.set('view', 'spatial'); query.set('geography', 'location');
+  const data = await (await fetch(`${url}/api/series?${query}`)).json(), [lng, lat] = fixture.features[0].geometry.coordinates;
+  assert.equal(data.geography, 'location'); assert.equal(data.cells.length, 1); assert.match(data.meaning, /Exact reported coordinates/);
+  assert.equal(data.cells[0].id, `point:${lng},${lat}`); assert.deepEqual(data.cells[0].center, [lng, lat]);
+  assert.equal(data.cells[0].sourceRecords, 1); assert.equal(data.cells[0].peakCustomers, 20);
+  const csv = await fetch(`${url}/api/export.csv?${new URLSearchParams({ view: 'locations', from: query.get('from'), to: query.get('to') })}`);
+  assert.equal(csv.status, 200); assert.match(csv.headers.get('content-disposition'), /mlgw-reported-locations\.csv/);
+  const lines = (await csv.text()).trim().split('\r\n');
+  assert.equal(lines.length, 2); assert.ok(lines[1].startsWith(`"point:${lng},${lat}","${lng}","${lat}","1",`));
+  assert.doesNotMatch(lines.join(), /THIS MUST STAY PRIVATE/);
+  assert.equal((await fetch(`${url}/api/export.csv?view=locations&from=garbage`)).status, 400);
+});

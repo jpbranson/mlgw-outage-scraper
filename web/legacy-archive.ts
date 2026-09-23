@@ -24,7 +24,7 @@ const time = (value: string | number) => new Intl.DateTimeFormat('en-US', { time
 const option = (text: string, value: string) => { const node = document.createElement('option'); node.textContent = text; node.value = value; return node; };
 const monthSelect = el<HTMLSelectElement>('legacy-month'), dateInput = el<HTMLInputElement>('archive-date'), captureSelect = el<HTMLSelectElement>('legacy-capture'), slider = el<HTMLInputElement>('time-slider');
 let catalog: Catalog, captures: Capture[] = [], series: Series | null = null, selectedId = '', metric: 'customers' | 'outages' = 'customers';
-let dayRequest = 0, snapshotRequest = 0, seriesRequest = 0, tileFailed = false, notice = 'Select a capture to inspect its grid coverage.';
+let dayRequest = 0, snapshotRequest = 0, seriesRequest = 0, playing = false, playTimer = 0, tileFailed = false, notice = 'Select a capture to inspect its grid coverage.';
 const map = L.map('map', { preferCanvas: true, scrollWheelZoom: false, zoomAnimation: false, fadeAnimation: false }).setView([35.14, -89.88], 10);
 const areas = L.layerGroup().addTo(map);
 const showError = (error: unknown) => { put('error-text', error instanceof Error ? error.message : String(error)); el('error').hidden = false; };
@@ -36,7 +36,29 @@ function clearSnapshot(message: string) {
   mapNotice(message); put('grid-summary', 'Missing geometry is unknown.'); put('capture-note', 'No capture selected.'); put('provenance-note', '');
   el('geojson').removeAttribute('href'); el('geojson').setAttribute('aria-disabled', 'true'); chart.update('none');
 }
-function replayButtons(index: number) { el<HTMLButtonElement>('previous').disabled = index <= 0; el<HTMLButtonElement>('next').disabled = index < 0 || index >= captures.length - 1; }
+function replayButtons(index: number) { el<HTMLButtonElement>('previous').disabled = index <= 0; el<HTMLButtonElement>('next').disabled = index < 0 || index >= captures.length - 1; el<HTMLButtonElement>('play').disabled = !playing && !captures.length; }
+function renderPlay() {
+  el('play').setAttribute('aria-pressed', String(playing)); el('play').setAttribute('aria-label', playing ? 'Pause replay' : 'Play replay');
+  el('play-icon').setAttribute('d', playing ? 'M8 5v14M16 5v14' : 'M7 4.5v15l12-7.5z'); replayButtons(captures.findIndex(c => c.id === selectedId));
+}
+function stopPlayback() { if (!playing) return; playing = false; window.clearTimeout(playTimer); renderPlay(); }
+// One capture per step; at the end of a UTC day, continue with the next day that has numeric observations.
+async function step() {
+  if (!playing) return;
+  try {
+    const index = captures.findIndex(c => c.id === selectedId), row = captures[index + 1];
+    if (row) await loadSnapshot(row.id);
+    else {
+      const following = new Date(Date.parse(dateInput.value + 'T00:00:00Z') + 86400000).toISOString().slice(0, 10);
+      if (following > dateInput.max) { stopPlayback(); put('day-coverage', 'Replay reached the end of the legacy archive.'); return; }
+      const monthChanged = following.slice(0, 7) !== monthSelect.value;
+      dateInput.value = following; monthSelect.value = following.slice(0, 7);
+      await loadDay(); if (monthChanged) void loadSeries().catch(showError);
+      if (!captures.length) { stopPlayback(); put('day-coverage', `No numeric observations on ${following} (UTC). Replay paused; missing history is unknown.`); return; }
+    }
+    if (playing) playTimer = window.setTimeout(() => void step(), Number(el<HTMLSelectElement>('play-speed').value));
+  } catch (error) { stopPlayback(); showError(error); }
+}
 async function loadSnapshot(id: string) {
   clearSnapshot('Loading capture…'); const request = ++snapshotRequest;
   const data = await api<Snapshot>('/api/legacy/snapshot/' + encodeURIComponent(id)); if (request !== snapshotRequest) return;
@@ -77,7 +99,7 @@ const chart = new Chart(el<HTMLCanvasElement>('chart'), { type: 'line', data: { 
     y: { beginAtZero: true, border: { display: false }, grid: { color: '#e5e5e5', drawTicks: false }, ticks: { maxTicksLimit: 6 } } },
   onClick: (_event, active) => { const p = series?.points[active[0]?.index]; const id = metric === 'outages' ? p?.outageId ?? p?.id : p?.id;
     const at = metric === 'outages' ? p?.outageCapturedAt ?? p?.capturedAt : p?.capturedAt;
-    if (id && at) { dateInput.value = at.slice(0, 10); run(loadDay(id)); }
+    if (id && at) { stopPlayback(); dateInput.value = at.slice(0, 10); run(loadDay(id)); }
   }
 }, plugins: [{ id: 'legacySelected', afterDraw(chart) {
   const index = series?.points.findIndex(p => (metric === 'outages' ? p.outageId ?? p.id : p.id) === selectedId) ?? -1;
@@ -125,15 +147,16 @@ function renderCatalog(data: Catalog) {
     ...data.coverage.missingSavedPages.map(r => `Missing saved-page counterpart: ${r.captureKey}.`) ];
   el('legacy-exceptions').replaceChildren(...notes.map(text => { const li = document.createElement('li'); li.textContent = text; return li; }));
 }
-monthSelect.addEventListener('change', () => { el<HTMLSelectElement>('legacy-resolution').value = 'daily'; dayRequest++; snapshotRequest++; run(changeMonth()); });
-dateInput.addEventListener('change', () => { if (!dateInput.value) return; monthSelect.value = dateInput.value.slice(0, 7); run(Promise.all([loadDay(), loadSeries()])); });
+el('play').addEventListener('click', () => { if (playing) { stopPlayback(); return; } playing = true; renderPlay(); el('error').hidden = true; void step(); });
+monthSelect.addEventListener('change', () => { stopPlayback(); el<HTMLSelectElement>('legacy-resolution').value = 'daily'; dayRequest++; snapshotRequest++; run(changeMonth()); });
+dateInput.addEventListener('change', () => { stopPlayback(); if (!dateInput.value) return; monthSelect.value = dateInput.value.slice(0, 7); run(Promise.all([loadDay(), loadSeries()])); });
 el('legacy-resolution').addEventListener('change', () => run(loadSeries()));
-captureSelect.addEventListener('change', () => run(loadSnapshot(captureSelect.value)));
-slider.addEventListener('input', () => { const row = captures[Number(slider.value)]; if (row) run(loadSnapshot(row.id)); });
-for (const [id, offset] of [['previous', -1], ['next', 1]] as const) el(id).addEventListener('click', () => { const row = captures[Number(slider.value) + offset]; if (row) run(loadSnapshot(row.id)); });
+captureSelect.addEventListener('change', () => { stopPlayback(); run(loadSnapshot(captureSelect.value)); });
+slider.addEventListener('input', () => { stopPlayback(); const row = captures[Number(slider.value)]; if (row) run(loadSnapshot(row.id)); });
+for (const [id, offset] of [['previous', -1], ['next', 1]] as const) el(id).addEventListener('click', () => { stopPlayback(); const row = captures[Number(slider.value) + offset]; if (row) run(loadSnapshot(row.id)); });
 document.querySelectorAll<HTMLButtonElement>('[data-metric]').forEach(button => button.addEventListener('click', () => { metric = button.dataset.metric as typeof metric; document.querySelectorAll<HTMLButtonElement>('[data-metric]').forEach(b => b.setAttribute('aria-pressed', String(b === button))); renderChart(); }));
 el('fit-map').addEventListener('click', () => map.setView([35.14, -89.88], 10));
-el('retry').addEventListener('click', () => run(initialize()));
+el('retry').addEventListener('click', () => { stopPlayback(); run(initialize()); });
 async function initialize() { dayRequest++; snapshotRequest++; seriesRequest++; renderCatalog(await api<Catalog>('/api/legacy/catalog')); await changeMonth(); }
 void api<{ tiles: string; attribution: string; attributionUrl: string }>('/api/config').then(config => {
   if (!config.tiles) return; const link = document.createElement('a'); link.href = config.attributionUrl; link.textContent = config.attribution; link.target = '_blank'; link.rel = 'noopener noreferrer';

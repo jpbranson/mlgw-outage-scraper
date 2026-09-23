@@ -6,7 +6,7 @@ import {sourceRequest} from '../src/weather/sources.mjs';
 import {stationSubset} from '../src/weather/decode.mjs';
 import {stationQuality} from '../src/weather/station-quality.mjs';
 import {outageHours,COMPARISON_VERSION} from '../src/weather/comparisons.mjs';
-import {temperatureHours,matchTemperature,temperatureGeography,TEMPERATURE_VERSION} from '../src/weather/temperature-comparisons.mjs';
+import {temperatureHours,matchTemperature,temperatureGeography,temperatureText,TEMPERATURE_VERSION} from '../src/weather/temperature-comparisons.mjs';
 import {LegacyService} from '../src/dashboard/legacy.mjs';
 import {hourlyAnchors,screenReference} from '../src/weather/references.mjs';
 import {stormEventArchive,stormEventWindow} from '../src/weather/event-context.mjs';
@@ -43,15 +43,11 @@ try {
     const byLag=referenceByLag.map(m=>({lagHours:m.lagHours,matches:outage.hours.map((h,i)=>({...h,exposureFrom:hours[i-1-m.lagHours]?.from??null,exposureTo:hours[i-1-m.lagHours]?.to??null,
       temperatureC:(family==='winter'?hours[i-1-m.lagHours]?.minC:hours[i-1-m.lagHours]?.maxC)??null})),geography:temperatureGeography(snapshots,m.pairs)}));
     const inputBundle=publish({episode,observations:rows,referenceObservations:referenceRows,snapshots,station:cache.derived(manifest,station),referenceStation:cache.derived(manifest,referenceStation),context:cache.derived(eventManifest,context)});
-    const result={version:COMPARISON_VERSION,analysisVersion:TEMPERATURE_VERSION,kind:'temperature',id:episode.id,name:family==='winter'?'December 22–24, 2022 · Cold':'June 29–July 1, 2023 · Heat',family,from:new Date(start).toISOString(),to:new Date(end).toISOString(),
+    const {name,interpretation}=temperatureText(episode);
+    const result={version:COMPARISON_VERSION,analysisVersion:TEMPERATURE_VERSION,kind:'temperature',id:episode.id,name,family,from:new Date(start).toISOString(),to:new Date(end).toISOString(),
       sourceFormat:'legacy_html',outage:outage.summary,outageHours:outage.hours,temperature:{hours,summary:station.summary.temperature,station:station.station},context,byLag,
       matchedReference:{from:selected.from,to:selected.to,selection:{selected,candidates},outage:outageHours(referenceRows,selected.from,selected.to).summary,temperature:{hours:referenceHours,summary:referenceStation.summary.temperature},byLag:referenceByLag},
-      interpretation:['Airport temperature is regional context. Hourly report minima/maxima are not continuous exposure measurements.',
-        'Below 0°C and at least 32°C are fixed analytical thresholds, not proof of snow, ice accumulation, a heat wave or utility equipment damage. Finalized hazard records are separate context.',
-        'One independent case per temperature category; six pairs support only a descriptive median. No uncertainty interval or stable geographic ranking is supported.',
-        'The earlier dry/low-wind reference is chosen by calendar, timing and station coverage before reading outage values. Each paired reference exposure also requires known low airport wind and nominal report-hour precipitation, and temperature outside the case threshold.',
-        'No radar rainfall is inferred for these station cases. New events, population rates and complete customer-hours are unavailable from this sparse legacy history.',
-        ...(family==='heat'?['The heat case follows the June 25 storm. Outages already present may persist; its contrast cannot isolate heat from storm recovery.']:[])],
+      interpretation,
       provenance:{configSha256:sha256(configBytes),screenSha256:sha256(screenBytes),policySha256:sha256(policyBytes),legacyIndex:legacyCatalog.index,
         station:{id:manifest.id,sha256:manifest.body.sha256,url:manifest.request.url},events:{id:eventManifest.id,sha256:eventManifest.body.sha256,url:eventManifest.request.url},inputBundle}};
     const output=publish(result);entries.push({id:result.id,name:result.name,kind:'temperature',from:result.from,to:result.to,...output});

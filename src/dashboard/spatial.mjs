@@ -14,6 +14,12 @@ export function locationCell(coordinates) {
   const x = Math.floor((lng - LON0) * X_SCALE / CELL), y = Math.floor((lat - LAT0) * Y_SCALE / CELL);
   return { id: `${x}:${y}`, center: [LON0 + (x + .5) * CELL / X_SCALE, LAT0 + (y + .5) * CELL / Y_SCALE] };
 }
+// Same exact-coordinate site identity and review bounds as the offline
+// reported-outage-locations dataset: no rounding, snapping or inferred footprint.
+export function exactLocation(coordinates) {
+  if (!locationCell(coordinates)) return null;
+  return { id: `point:${coordinates[0]},${coordinates[1]}`, center: [coordinates[0], coordinates[1]] };
+}
 
 // Each source ID/start pair is provisional, not a confirmed unique incident.
 // Deduplicate repeated polls within each fixed cell; never sum customer counts over time.
@@ -59,17 +65,17 @@ export async function spatialHistory({ rows, from, to, readDetail, comparable, l
       if (event.cells.size > 1) event.uncertain = true;
       let cell = cells.get(location.id);
       if (!cell) {
-        cell = { ...location, keys: new Set(), firstSeenAt: row.at, lastSeenAt: row.at,
+        cell = { ...location, keys: new Set(), records: new Set(), firstSeenAt: row.at, lastSeenAt: row.at,
           peakCustomers: 0, observations: 0 };
         cells.set(location.id, cell);
       }
-      cell.keys.add(key); cell.lastSeenAt = row.at; cell.observations++;
+      cell.keys.add(key); cell.records.add(feature.id); cell.lastSeenAt = row.at; cell.observations++;
       customersThisCapture.set(cell.id, (customersThisCapture.get(cell.id) ?? 0) + feature.properties.customers);
     }
     for (const [id, customers] of customersThisCapture) cells.get(id).peakCustomers = Math.max(cells.get(id).peakCustomers, customers);
     if (index % 8 === 0) await yieldTurn();
   }
-  const resultCells = [...cells.values()].map(({ keys, ...cell }) => ({ ...cell, events: keys.size,
+  const resultCells = [...cells.values()].map(({ keys, records, ...cell }) => ({ ...cell, events: keys.size, sourceRecords: records.size,
     uncertainEvents: [...keys].filter(key => events.get(key).uncertain).length }));
   return { from, to, grid: SPATIAL_GRID, cells: resultCells.sort((a, b) => b.events - a.events || a.id.localeCompare(b.id)),
     reportedEvents: events.size, uncertainEvents: [...events.values()].filter(e => e.uncertain).length,

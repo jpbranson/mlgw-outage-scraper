@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 const base = process.argv[2]; if (!base || !/^https?:\/\//.test(base)) throw Error('Pass the deployed dashboard origin');
 const requests = [];
 async function get(path, { status = 200, json = true, ...options } = {}) {
@@ -18,15 +18,23 @@ const period = new URLSearchParams({ from, to, resolution: 'hourly' });
 await get(`/api/series?${period}`); await get(`/api/series?${period}&view=spatial`);
 await get(`/api/series?${period}&view=spatial&geography=block-group`);
 await get('/api/config?view=census'); await get(`/api/export.csv?${period}`, { json: false });
+const locations = await get(`/api/series?${period}&view=spatial&geography=location`);
+assert.equal(locations.geography, 'location'); assert.ok(locations.cells.every(c => c.id === `point:${c.center[0]},${c.center[1]}` && c.sourceRecords >= 1));
+await get(`/api/export.csv?${new URLSearchParams({ view: 'locations', from, to })}`, { json: false });
 const legacy = await get('/api/legacy/catalog'), cases = await get('/api/legacy/catalog?view=comparisons');
-assert.equal(cases.entries.length, 4);
+// The deployed catalog must match the locally prepared rainfall/wind and temperature catalogs.
+const expectedCases = ['data/comparisons/catalog.json', 'data/comparisons/conditions/catalog.json'].flatMap(path => JSON.parse(readFileSync(path, 'utf8')).entries.map(e => e.id)).sort();
+assert.deepEqual(cases.entries.map(e => e.id).sort(), expectedCases);
 for (const item of cases.entries) {
   await get(`/api/legacy/series?view=comparisons&id=${item.id}&lag=0`);
   await get(`/api/legacy/export.csv?view=comparisons&id=${item.id}&lag=0`, { json: false });
 }
-await get(`/api/weather?at=${encodeURIComponent(to)}`); await get('/api/weather/periods');
+await get(`/api/weather?at=${encodeURIComponent(to)}`); const periods = (await get('/api/weather/periods')).periods;
+// Rolling totals appear once 24 hourly frames are retained; any published one must load.
+const rolling = periods.filter(p => p.rolling);
+for (const p of [periods[0], rolling[0]].filter(Boolean)) await get(`/api/weather/period?id=${p.id}`);
 await get('/data/collector/index.sqlite', { status: 404 }); await get('/api/admin', { status: 404 });
 await get('/api/latest', { status: 405, method: 'POST' }); await get('/api/latest', { status: 403, headers: { Origin: 'https://foreign.example' } });
-const report = { checkedAt: new Date().toISOString(), base, passed: true, health, comparisonCases: cases.entries.map(e => e.id), legacyAvailable: !!legacy, requests };
+const report = { checkedAt: new Date().toISOString(), base, passed: true, health, comparisonCases: cases.entries.map(e => e.id), rollingRainfallPeriods: rolling.map(p => p.to), exactLocations: locations.cells.length, legacyAvailable: !!legacy, requests };
 writeFileSync('reports/cloud-verification.json', JSON.stringify(report, null, 2));
 console.log(JSON.stringify({ checkedAt: report.checkedAt, base, passed: true, checks: requests.length, latest: health.latest, freshness: health.status, comparisonCases: report.comparisonCases }));

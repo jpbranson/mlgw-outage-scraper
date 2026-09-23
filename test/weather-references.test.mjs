@@ -59,3 +59,11 @@ test('reference matching rejects unaligned weather, future station reports, unsu
   const shifted=structuredClone(f);shifted.referenceRain[0].to=shifted.referenceRain[1].to;assert.throws(()=>matchReference(shifted,policy),/interval/);
   const future=structuredClone(f);future.referenceWind[0].sustained.at=future.referenceWind[0].to;assert.throws(()=>matchReference(future,policy),/outside/);
 });
+test('every comparison episode has a 72-hour, calendar-matched reference rainfall window from the fixed offsets',()=>{
+  const config=JSON.parse(readFileSync(new URL('../config/weather-comparisons.json',import.meta.url)));
+  for(const e of config.episodes) {
+    const id=/^reports\/(rainfall-[a-z0-9-]+)-validation\.json$/.exec(e.referenceRainfallReport)[1],r=JSON.parse(readFileSync(new URL(`../config/${id}.json`,import.meta.url)));
+    assert.equal(r.reportId,id);assert.equal(Date.parse(r.to)-Date.parse(r.from),72*H);assert.deepEqual(r.periodHours,[72]);
+    assert.ok(policy.candidateDaysBefore.includes((Date.parse(e.from)-Date.parse(r.from))/(24*H)),e.id);assert.equal(referenceCalendar(e.from,r.from,policy),true);
+  }
+});
