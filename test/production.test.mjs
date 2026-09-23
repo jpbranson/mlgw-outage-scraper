@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { request } from 'node:http';
+import { gzipSync } from 'node:zlib';
 import { LocalCollector } from '../src/durable/collector.mjs';
 import { digest } from '../src/durable/archive.mjs';
 import { productionStep, recoverProduction, finishStagedAttempt } from '../src/durable/production.mjs';
@@ -68,6 +69,23 @@ test('staging is preserved if the canonical archive is corrupt', async t => {
   writeFileSync(s.collector.archive.path(manifest.bodies.feed.key), 'corrupt');
   assert.throws(() => finishStagedAttempt(s.collector, s.staging, record));
   assert.equal(existsSync(join(s.staging, `${record.id}.geojson`)), true);
+});
+test('production recovers a pending capture matching an archive from another OS', async t => {
+  const s = setup(t), record = await s.capture(), stored = gzipSync(fixture, { level: 6 });
+  stored[9] = stored[9] === 10 ? 3 : 10;
+  const key = `objects/${digest(fixture)}.gz`;
+  s.collector.archive.put(key, stored);
+  s.collector.acquireLease(s.owner);
+  const result = await recoverProduction(s.collector, s.staging, s.owner, s.now);
+  assert.equal(result.record.id, record.id);
+  assert.equal(s.collector.health().latest.id, record.id);
+  assert.equal(existsSync(join(s.staging, `${record.id}.attempt.json`)), false);
+  assert.equal(existsSync(join(s.staging, `${record.id}.geojson`)), false);
+  const { manifest } = s.collector.archive.readManifest(`manifests/${record.id}.json`);
+  assert.deepEqual(s.collector.archive.readBody(manifest.bodies.feed), fixture);
+  assert.deepEqual(readFileSync(s.collector.archive.path(key)), stored);
+  assert.equal((await productionStep(s)).action, 'waiting');
+  assert.equal(s.calls(), 1);
 });
 test('production locks refuse a live owner and release cleanly', () => {
   const path = join(mkdtempSync(join(tmpdir(), 'mlgw-lock-')), 'runner.lock'), unlock = processLock(path);

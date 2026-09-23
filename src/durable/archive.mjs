@@ -17,7 +17,7 @@ export class Archive {
     if (!child || child.startsWith('..') || isAbsolute(child)) throw new Error('Archive key escapes root');
     return target;
   }
-  put(key, bytes) {
+  put(key, bytes, { matchesExisting = existing => existing.equals(Buffer.from(bytes)) } = {}) {
     const target = this.path(key); mkdirSync(dirname(target), { recursive: true });
     const temp = `${target}.${randomUUID()}.tmp`;
     writeFileSync(temp, bytes, { flag: 'wx', flush: true });
@@ -26,7 +26,7 @@ export class Archive {
       try { linkSync(temp, target); }
       catch (error) {
         if (error.code !== 'EEXIST') throw error;
-        if (!readFileSync(target).equals(Buffer.from(bytes))) throw new Error(`Immutable object conflict: ${key}`);
+        if (!matchesExisting(readFileSync(target))) throw new Error(`Immutable object conflict: ${key}`);
       }
     } finally { unlinkSync(temp); }
     return key;
@@ -35,9 +35,13 @@ export class Archive {
     if (body.length > MAX_BODY) throw new Error('Body exceeds archive limit');
     const hash = digest(body), compressed = gzipSync(body, { level: 6 });
     const key = `objects/${hash}.gz`;
-    this.put(key, compressed);
-    if (!gunzipSync(readFileSync(this.path(key)), { maxOutputLength: MAX_BODY }).equals(body)) throw new Error('Archive verification failed');
-    return { key, hash, bytes: body.length, compressedBytes: compressed.length };
+    // The key identifies the original bytes. Gzip headers/compression can vary
+    // across platforms and versions; preserve an existing equivalent encoding.
+    const matchesExisting = stored => gunzipSync(stored, { maxOutputLength: MAX_BODY }).equals(body);
+    this.put(key, compressed, { matchesExisting });
+    const stored = readFileSync(this.path(key));
+    if (!matchesExisting(stored)) throw new Error('Archive verification failed');
+    return { key, hash, bytes: body.length, compressedBytes: stored.length };
   }
   readBody(ref) {
     const body = gunzipSync(readFileSync(this.path(ref.key)), { maxOutputLength: MAX_BODY });

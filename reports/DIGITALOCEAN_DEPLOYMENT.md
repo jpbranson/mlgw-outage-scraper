@@ -43,6 +43,16 @@ At the initial operating check, the VM had about **44 GiB free disk space** and 
 
 **Documentation audit, September 22 at 16:26 UTC:** read-only checks confirmed that the dashboard, both collectors, Caddy, health timer and certificate timer were active; application services and timers were enabled at boot. Public health was `ok` with the 16:25:22 UTC capture, and the private health check reported no issues. About 44 GiB remained free. This audit did not restart services or rerun the deployment tests.
 
+## September 22 archive compatibility repair
+
+At 4:10 PM CDT (21:10 UTC), the outage collector encountered an empty feed identical to one migrated from Windows. Its gzip header differed from Linux's encoding by one OS metadata byte. The archive writer compared compressed bytes even though the object key identifies the uncompressed original, raised `Immutable object conflict`, and repeatedly failed during startup recovery. The dashboard continued serving the 4:05 PM capture; weather collection remained active.
+
+The repair preserves an existing gzip file when bounded decompression matches the original exactly, reports its actual stored size, and retains strict byte comparisons for manifests/parsers. Corrupt or mismatched originals still fail. All **192 Node tests passed locally**, including five added regression tests; **30 archive, durable collector and production tests passed on the Linux VM** before deployment.
+
+The active release's `src/durable/archive.mjs` was patched at **10:14 PM CDT on September 22 (03:14 UTC September 23)** and only the outage collector was restarted. The pending 4:10 PM capture was recovered with verified detail. Fresh captures published at **10:14:30 PM** and the next scheduled **10:15:01 PM CDT**. All **30 public HTTPS checks passed**, and the private health check returned `ok` with no issues. The conflicting archived gzip retained its exact checksum. The approximately six-hour interval without observations remains a collection gap; recovery does not invent missing captures.
+
+The deployment record, Linux test log, prior module and prior collector state are retained in `/opt/mlgw/hotfixes/2026-09-23-archive-gzip/`. The installed module's SHA-256 is `8900a042322f99bf4052d8de1af70a4cbee3ec836bac3789d5f1c55b2eaa9398`. The prior module is `archive.mjs.before`; no canonical archive objects were replaced or removed.
+
 ## Operating commands
 
 Run from `C:\Developer\mlgw-outage-scraper` in PowerShell:
