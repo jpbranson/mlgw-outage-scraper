@@ -9,6 +9,7 @@
   "scripts": {
     "test": "node --test",
     "test:browser": "playwright test",
+    "knowledge:check": "node scripts/check-knowledge.mjs",
     "deploy:release": "node scripts/prepare-deployment.mjs --code-only",
     "collector:rebuild": "node scripts/rebuild-index.mjs",
     "pilot": "node scripts/pilot.mjs",
